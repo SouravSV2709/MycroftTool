@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA Management Tool</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@3.6.4/dist/full.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.38.4/dist/umd/supabase.min.js"></script>
+  <script src="supabaseConfig.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+  <script>
+    const bcrypt = dcodeIO.bcrypt;
+  </script>
+  <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <style>
+    #toast {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Toast -->
+  <div id="toast" class="hidden alert alert-success shadow-lg w-fit"></div>
+
+  <!-- Auth Section -->
+  <section id="authSection" class="max-w-md mx-auto mt-10 bg-white p-6 rounded-xl shadow">
+    <h2 class="text-2xl font-bold mb-4 text-center">Login</h2>
+    <form id="loginForm" class="space-y-4">
+      <input type="email" name="email" id="loginEmail" placeholder="Email" class="input input-bordered w-full"
+        required />
+      <div class="relative">
+        <input type="password" name="password" id="loginPassword" placeholder="Password"
+          class="input input-bordered w-full pr-10" required />
+        <button type="button" id="togglePassword"
+          class="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm text-blue-600">Show</button>
+      </div>
+      <label class="label cursor-pointer justify-start gap-2">
+        <input type="checkbox" id="rememberMe" class="checkbox" />
+        <span class="label-text">Remember me</span>
+      </label>
+      <button type="submit" class="btn btn-primary w-full">Login</button>
+    </form>
+  </section>
+
+  <!-- Main App -->
+  <div id="mainApp" class="hidden">
+    <div class="max-w-7xl mx-auto p-6">
+      <!-- Header -->
+      <header class="flex justify-between items-center mb-6">
+        <img src="logo-221bbs.png" alt="Logo" class="h-20 w-auto mr-4">
+        <div>
+          <h1 class="text-3xl font-bold text-primary">Mycroft QA Management Tool</h1>
+          <p class="text-sm text-gray-500">Track bugs and improvements</p>
+        </div>
+        <div class="text-right">
+          <p class="text-sm text-gray-600">Logged in as <span id="currentUserDisplay" class="font-semibold"></span></p>
+          <button id="logoutBtn" class="btn btn-sm mt-2">Logout</button>
+        </div>
+      </header>
+
+      <!-- Issue Form in modal-->
+
+      <button id="createIssueBtn" class="btn btn-primary mb-4">Create New Issue</button>
+
+      <dialog id="createIssueModal" class="modal">
+        <div class="modal-box w-full max-w-2xl">
+          <h2 class="text-2xl font-semibold mb-4">Create New Issue</h2>
+          <form id="issueForm" class="space-y-4">
+            <input type="text" name="summary" placeholder="Summary" class="input input-bordered w-full" required />
+            <div id="createDescEditor" class="quill bg-white"></div>
+            <input type="hidden" name="description" required>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <select name="type" class="select select-bordered w-full">
+                <option>Bug</option>
+                <option>Improvement</option>
+                <option>Test</option>
+              </select>
+              <select name="priority" class="select select-bordered w-full">
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+              </select>
+            </div>
+            <input name="tags" placeholder="Tags (comma-separated)" class="input input-bordered w-full" />
+            <input type="file" id="imageInput" name="images" multiple accept="image/*"
+              class="file-input file-input-bordered w-full" />
+            <div id="preview" class="flex flex-wrap gap-2"></div>
+            <button type="submit" class="btn btn-success">Submit Issue</button>
+          </form>
+          <div class="modal-action">
+            <button class="btn" onclick="document.getElementById('createIssueModal').close()">Close</button>
+          </div>
+        </div>
+      </dialog>
+
+
+      <!-- Filters -->
+      <section class="bg-white p-6 rounded-xl shadow mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" id="statusCounts"></div>
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+            <input type="text" id="filterInput" placeholder="Search by summary or tag..."
+              class="input input-bordered w-full" />
+            <select id="filterType" class="select select-bordered w-full">
+              <option value="">All Types</option>
+              <option>Bug</option>
+              <option>Improvement</option>
+              <option>Test</option>
+            </select>
+            <select id="filterPriority" class="select select-bordered w-full">
+              <option value="">All Priorities</option>
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+            </select>
+            <select id="filterStatus" class="select select-bordered w-full">
+              <option value="">All Statuses</option>
+              <option>Open</option>
+              <option>In development</option>
+              <option>Ready for QA</option>
+              <option>Closed</option>
+            </select>
+          </div>
+          <div>
+            <button id="clearFiltersBtn" class="btn btn-sm btn-outline mt-2 md:mt-0">Clear Filters</button>
+          </div>
+          <div class="flex gap-4 items-center">
+            <label class="label-text">Sort by:</label>
+            <select id="sortSelect" class="select select-bordered">
+              <option value="">None</option>
+              <option value="tag">Tag (A-Z)</option>
+              <option value="created_desc">Created Date (Newest)</option>
+              <option value="created_asc">Created Date (Oldest)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Issue List -->
+      <div id="issueList" class="space-y-2"></div>
+
+      <!-- View/Edit Modal -->
+      <dialog id="viewModal" class="modal">
+        <div class="modal-box w-full max-w-2xl">
+          <div id="viewMode">
+            <h3 class="text-xl font-bold mb-2" id="viewSummary"></h3>
+            <p class="text-sm text-gray-500">Issue #: <span id="viewIssueNumber"></span></p>
+            <p class="text-sm text-gray-600" id="viewMeta"></p>
+            <div class="prose max-w-none mt-4" id="viewDescription"></div>
+            <p class="mt-4"><strong>Tags:</strong> <span id="viewTags"></span></p>
+            <p class="text-sm text-gray-400 mt-2">Created by: <span id="viewCreatedBy"></span></p>
+            <div class="flex flex-wrap gap-2 mt-4" id="viewImages"></div>
+            <!-- Updated view images with click to enlarge -->
+            <style>
+              .modal-img {
+                max-height: 80vh;
+              }
+            </style>
+            <dialog id="imgModal" class="modal" onclick="this.close()">
+              <div class="modal-box p-2 max-w-4xl" onclick="event.stopPropagation()">
+                <img id="modalImg" class="mx-auto modal-img rounded shadow" src="" alt="Full Image" />
+                <div class="text-center mt-4">
+                  <button onclick="imgModal.close()" class="btn">Close</button>
+                </div>
+              </div>
+            </dialog>
+            <div class="modal-action mt-6">
+              <button class="btn" onclick="viewModal.close()">Close</button>
+              <button class="btn btn-primary" onclick="toggleEditForm(true)">Edit</button>
+            </div>
+          </div>
+          <form id="editForm" class="space-y-4 hidden">
+            <p class="text-sm text-gray-500">Issue #: <span id="editIssueNumber"></span></p>
+            <input type="hidden" name="editId" />
+            <input name="summary" placeholder="Summary" class="input input-bordered w-full" required />
+            <div id="editDescEditor" class="quill bg-white"></div>
+            <input type="hidden" name="description" required>
+            <select name="type" class="select select-bordered w-full">
+              <option>Bug</option>
+              <option>Improvement</option>
+              <option>Test</option>
+            </select>
+            <select name="priority" class="select select-bordered w-full">
+              <option>Low</option>
+              <option>Medium</option>
+              <option>High</option>
+            </select>
+            <select name="status" class="select select-bordered w-full">
+              <option>Open</option>
+              <option>In development</option>
+              <option>Ready for QA</option>
+              <option>Closed</option>
+            </select>
+            <input name="tags" placeholder="Tags" class="input input-bordered w-full" />
+            <input type="file" id="editImageInput" name="editImages" multiple accept="image/*"
+              class="file-input file-input-bordered w-full" />
+            <div id="editPreview" class="flex flex-wrap gap-2"></div>
+            <div class="modal-action">
+              <button type="button" class="btn" onclick="toggleEditForm(false)">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </dialog>
+    </div>
+  </div>
+
+  <!-- Full App Script -->
+  <script>
+
+    (async function () {
+      await initSupabaseFromConfig();
+
+      if (!supa) {
+        alert('Could not initialize Supabase config');
+        return;
+      }
+
+      // Only after Supabase is ready
+      const saved = localStorage.getItem('qa_user');
+      if (saved) {
+        currentUser = JSON.parse(saved);
+        updateAuthUI(); // ← this will safely call loadIssues() now
+      }
+    })();
+
+
+
+    let createQuill, editQuill;
+    let currentUser = null;
+    let allIssues = [];
+    let editRemovedImages = new Set();
+
+    // Cache to avoid repeat DB calls
+    const tagColorMap = {};
+
+    async function getColorForTag(tag) {
+      if (tagColorMap[tag]) return tagColorMap[tag];
+
+      // Try fetching color from DB
+      const { data, error } = await supa.from('tag_colors').select('color').eq('tag', tag).single();
+      if (data && data.color) {
+        tagColorMap[tag] = data.color;
+        return data.color;
+      }
+
+      // Not found? Generate, store, and return
+      const color = getRandomColor();
+      await supa.from('tag_colors').insert([{ tag, color }]);
+      tagColorMap[tag] = color;
+      return color;
+    }
+
+    document.getElementById('createIssueBtn').addEventListener('click', () => {
+      document.getElementById('createIssueModal').showModal();
+    });
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('togglePassword').addEventListener('click', () => {
+        const pwdInput = document.getElementById('loginPassword');
+        const toggleBtn = document.getElementById('togglePassword');
+        if (pwdInput.type === 'password') {
+          pwdInput.type = 'text';
+          toggleBtn.textContent = 'Hide';
+        } else {
+          pwdInput.type = 'password';
+          toggleBtn.textContent = 'Show';
+        }
+      });
+      // Load saved credentials if available
+      const savedEmail = localStorage.getItem('qa_saved_email');
+      const savedPassword = localStorage.getItem('qa_saved_password');
+      if (savedEmail && savedPassword) {
+        document.getElementById('loginEmail').value = savedEmail;
+        document.getElementById('loginPassword').value = savedPassword;
+        document.getElementById('rememberMe').checked = true;
+      }
+      createQuill = new Quill('#createDescEditor', {
+        theme: 'snow',
+        placeholder: 'Enter description here...'
+      });
+
+      editQuill = new Quill('#editDescEditor', {
+        theme: 'snow',
+        placeholder: 'Edit description here...'
+      });
+
+      const issueForm = document.getElementById('issueForm');
+      if (issueForm) {
+        issueForm.addEventListener('submit', () => {
+          issueForm.description.value = createQuill.root.innerHTML;
+        });
+      }
+
+      const editForm = document.getElementById('editForm');
+      if (editForm) {
+        editForm.addEventListener('submit', () => {
+          editForm.description.value = editQuill.root.innerHTML;
+        });
+      }
+
+      const saved = localStorage.getItem('qa_user');
+      if (saved) {
+        currentUser = JSON.parse(saved);
+        updateAuthUI();
+      }
+
+      document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const remember = document.getElementById('rememberMe').checked;
+  const emailField = document.getElementById('loginEmail');
+  const passwordField = document.getElementById('loginPassword');
+  const email = emailField.value.trim();
+  const password = passwordField.value;
+
+  if (remember) {
+    localStorage.setItem('qa_saved_email', email);
+    localStorage.setItem('qa_saved_password', password);
+  } else {
+    localStorage.removeItem('qa_saved_email');
+    localStorage.removeItem('qa_saved_password');
+  }
+
+  try {
+    const { data, error } = await supa.from('users').select('*').eq('email', email);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return showToast('Login failed', 'error');
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('No matching user found');
+      return showToast('User not found', 'error');
+    }
+
+    const user = data[0];
+
+    if (!user.password_hash) {
+      console.error('Missing password_hash for user:', user);
+      return showToast('Invalid user credentials', 'error');
+    }
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      console.warn('Incorrect password');
+      return showToast('Incorrect password', 'error');
+    }
+
+    // ✅ Success
+    currentUser = user;
+    localStorage.setItem('qa_user', JSON.stringify(user));
+    showToast('Login successful');
+    updateAuthUI();
+
+  } catch (err) {
+    console.error('Unexpected login error:', err);
+    showToast('Unexpected login error', 'error');
+  }
+});
+
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('qa_user');
+        currentUser = null;
+        updateAuthUI();
+        showToast('Logged out');
+      });
+
+      ['filterInput', 'filterType', 'filterPriority', 'filterStatus'].forEach(id => {
+        document.getElementById(id).addEventListener('input', applyFilters);
+        document.getElementById(id).addEventListener('change', applyFilters);
+      });
+
+      document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+        ['filterInput', 'filterType', 'filterPriority', 'filterStatus'].forEach(id => document.getElementById(id).value = '');
+        applyFilters();
+      });
+
+      document.getElementById('imageInput').addEventListener('change', function (e) {
+        const preview = document.getElementById('preview');
+        preview.innerHTML = '';
+        Array.from(e.target.files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = document.createElement('img');
+            img.src = event.target.result;
+            img.className = 'w-20 h-20 object-cover rounded';
+            preview.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      document.getElementById('issueForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const imageUrls = await uploadImages(form.images.files);
+        // Get latest issue_number
+        const { data: latest, error: latestErr } = await supa
+          .from('issues')
+          .select('issue_number')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        let nextNumber = 1;
+        if (latest && latest.length > 0 && latest[0].issue_number) {
+          const lastNum = parseInt(latest[0].issue_number.replace('MT-', ''), 10);
+          nextNumber = lastNum + 1;
+        }
+        const issueNumber = `MT-${nextNumber.toString().padStart(7, '0')}`;
+
+        const newIssue = {
+          issue_number: issueNumber,
+          summary: formData.get('summary'),
+          description: formData.get('description'),
+          type: formData.get('type'),
+          priority: formData.get('priority'),
+          status: 'Open',
+          tags: formData.get('tags'),
+          image_urls: imageUrls,
+          created_by: currentUser.username
+        };
+        const { error } = await supa.from('issues').insert([newIssue]);
+        if (error) return showToast('Failed to submit issue', 'error');
+        form.reset();
+        document.getElementById('preview').innerHTML = '';
+        showToast('Issue submitted');
+        loadIssues();
+      });
+
+      document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const id = form.editId.value;
+        const formData = new FormData(form);
+        const newImageUrls = await uploadImages(form.editImages.files);
+        const existingUrls = Array.from(document.getElementById('editPreview').querySelectorAll('img'))
+          .map(img => img.src)
+          .filter(url => !editRemovedImages.has(url));
+        for (const url of editRemovedImages) {
+          const filename = url.split('/').pop().split('?')[0];
+          await supa.storage.from('issues').remove([filename]);
+        }
+        const updated = {
+          summary: formData.get('summary'),
+          description: formData.get('description'),
+          type: formData.get('type'),
+          priority: formData.get('priority'),
+          status: formData.get('status'),
+          tags: formData.get('tags'),
+          image_urls: [...existingUrls, ...newImageUrls]
+        };
+        await supa.from('issues').update(updated).eq('id', id);
+        toggleEditForm(false);
+        viewModal.close();
+        showToast('Issue updated');
+        loadIssues();
+      });
+    });
+
+    async function uploadImages(files) {
+      const uploadedUrls = [];
+      for (const file of files) {
+        const filePath = `${Date.now()}_${file.name}`;
+        const { error } = await supa.storage.from('issues').upload(filePath, file);
+        if (!error) {
+          const { data } = supa.storage.from('issues').getPublicUrl(filePath);
+          uploadedUrls.push(data.publicUrl);
+        }
+      }
+      return uploadedUrls;
+    }
+
+    function showIssueDetails(issue) {
+      document.getElementById('viewSummary').textContent = `${issue.issue_number || ''} - ${issue.summary}`;
+      document.getElementById('viewIssueNumber').textContent = issue.issue_number || '';
+      document.getElementById('viewMeta').textContent = `${issue.type} • ${issue.priority} • ${issue.status}`;
+      document.getElementById('viewDescription').innerHTML = issue.description || '';
+      document.getElementById('viewTags').textContent = issue.tags || '';
+      document.getElementById('viewCreatedBy').textContent = issue.created_by;
+
+      const viewImgs = document.getElementById('viewImages');
+      viewImgs.innerHTML = '';
+      (issue.image_urls || []).forEach(url => {
+        const img = document.createElement('img');
+        img.src = url;
+        img.className = 'w-20 h-20 object-cover rounded cursor-pointer';
+        img.onclick = () => {
+          document.getElementById('modalImg').src = url;
+          document.getElementById('imgModal').showModal();
+        };
+        viewImgs.appendChild(img);
+      });
+
+      const form = document.getElementById('editForm');
+      form.editId.value = issue.id;
+      document.getElementById('editIssueNumber').textContent = issue.issue_number || '';
+      form.summary.value = issue.summary;
+      editQuill.root.innerHTML = issue.description || '';
+      form.type.value = issue.type;
+      form.priority.value = issue.priority;
+      form.status.value = issue.status;
+      form.tags.value = issue.tags || '';
+
+      const editPreview = document.getElementById('editPreview');
+      editPreview.innerHTML = '';
+      (issue.image_urls || []).forEach(url => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative';
+        const img = document.createElement('img');
+        img.src = url;
+        img.className = 'w-20 h-20 object-cover rounded cursor-pointer';
+        img.onclick = () => {
+          document.getElementById('modalImg').src = url;
+          document.getElementById('imgModal').showModal();
+        };
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.textContent = '×';
+        delBtn.className = 'absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center';
+        delBtn.onclick = () => { wrapper.remove(); editRemovedImages.add(url); };
+        wrapper.appendChild(img);
+        wrapper.appendChild(delBtn);
+        editPreview.appendChild(wrapper);
+      });
+
+      editRemovedImages = new Set();
+      viewModal.showModal();
+    }
+
+    function toggleEditForm(show) {
+      document.getElementById('viewMode').classList.toggle('hidden', show);
+      document.getElementById('editForm').classList.toggle('hidden', !show);
+    }
+
+    function updateAuthUI() {
+      const auth = document.getElementById('authSection');
+      const app = document.getElementById('mainApp');
+      if (currentUser) {
+        auth.classList.add('hidden');
+        app.classList.remove('hidden');
+        document.getElementById('currentUserDisplay').textContent = `${currentUser.username} (${currentUser.email})`;
+        loadIssues();
+      } else {
+        auth.classList.remove('hidden');
+        app.classList.add('hidden');
+      }
+    }
+
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = `alert alert-${type} shadow-lg w-fit`;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+
+    //Sorting the items
+
+    let currentSort = '';
+    document.getElementById('sortSelect').addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      applyFilters(); // re-render
+    });
+
+
+    function applyFilters() {
+      const keyword = document.getElementById('filterInput').value.toLowerCase();
+      const type = document.getElementById('filterType').value;
+      const priority = document.getElementById('filterPriority').value;
+      const status = document.getElementById('filterStatus').value;
+
+      let filtered = allIssues.filter(issue => (
+        (!keyword || (issue.issue_number || '').toLowerCase().includes(keyword)) &&
+        (!type || issue.type === type) &&
+        (!priority || issue.priority === priority) &&
+        (!status || issue.status === status) &&
+        (!keyword || issue.summary.toLowerCase().includes(keyword) || (issue.tags || '').toLowerCase().includes(keyword))
+      ));
+
+      // 🔽 Sorting
+      if (currentSort === 'tag') {
+        filtered.sort((a, b) => (a.tags || '').localeCompare(b.tags || ''));
+      } else if (currentSort === 'created_desc') {
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      } else if (currentSort === 'created_asc') {
+        filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      }
+
+      renderIssues(filtered);
+    }
+
+
+    function updateStatusCounts(issues) {
+      const counts = { Open: 0, 'In development': 0, 'Ready for QA': 0, Closed: 0 };
+      issues.forEach(issue => { if (counts[issue.status] !== undefined) counts[issue.status]++; });
+      const container = document.getElementById('statusCounts');
+      container.innerHTML = '';
+      Object.entries(counts).forEach(([status, count]) => {
+        const badge = document.createElement('div');
+        badge.className = `p-4 rounded-lg shadow text-center border`;
+        badge.innerHTML = `<p class="text-sm font-semibold">${status}</p><p class="text-xl font-bold">${count}</p>`;
+        container.appendChild(badge);
+      });
+    }
+
+    async function loadIssues() {
+      const { data: issues, error } = await supa.from('issues').select('*').order('created_at', { ascending: false });
+      if (error) return showToast('Error loading issues', 'error');
+      allIssues = issues;
+      applyFilters();
+    }
+
+    function getRandomColor() {
+      // Generate a random hex color code
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    async function renderIssues(issueList) {
+      const list = document.getElementById('issueList');
+      list.innerHTML = '';
+
+      for (const issue of issueList) {
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-xl p-4 shadow cursor-pointer hover:bg-gray-50';
+        card.onclick = () => showIssueDetails(issue);
+
+        const tags = issue.tags ? issue.tags.split(',').map(tag => tag.trim()) : [];
+        const tagsHtmlParts = await Promise.all(tags.map(async tag => {
+          const color = await getColorForTag(tag);
+          return `<span class="badge" style="background-color: ${color}; color: white; margin-right: 0.5rem;">${tag}</span>`;
+        }));
+        const tagsHtml = tagsHtmlParts.join(' ');
+
+        card.innerHTML = `
+      <div class="flex justify-between items-center">
+        <div>
+          <h3 class="text-lg font-semibold">${issue.issue_number || ''} - ${issue.summary}</h3>
+          <p class="text-sm text-gray-500">${issue.type} • ${issue.priority} • ${issue.status}</p>
+        </div>
+        <div class="text-sm text-right text-gray-400">${new Date(issue.created_at).toLocaleString()}
+          <div class="mt-2">${tagsHtml}</div>
+        </div>
+      </div>
+      <p class="mt-2 text-sm">${(issue.description || '').slice(0, 100)}...</p>
+    `;
+        list.appendChild(card);
+      }
+
+      updateStatusCounts(issueList);
+    }
+  </script>
+</body>
+
+</html>
