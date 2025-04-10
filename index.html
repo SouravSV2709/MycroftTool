@@ -410,7 +410,6 @@
         const saved = localStorage.getItem('qa_user');
         if (saved) {
           currentUser = JSON.parse(saved);
-          updateAuthUI();
           fetchUsernames(); // ✅ safe here because supa is ready
         }
       })();
