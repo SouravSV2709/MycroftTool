@@ -23,10 +23,23 @@
       right: 1rem;
       z-index: 1000;
     }
+
+    .slide-toggle {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease-in-out;
+    }
+
+    .slide-toggle.open {
+      max-height: 1000px;
+      /* large enough for any reply thread */
+    }
   </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen">
+
+  <datalist id="userSuggestions"></datalist>
 
   <!-- Toast -->
   <div id="toast" class="hidden alert alert-success shadow-lg w-fit"></div>
@@ -152,6 +165,18 @@
       <dialog id="viewModal" class="modal">
         <div class="modal-box w-full max-w-2xl">
           <div id="viewMode">
+            <dialog id="imgModal" class="modal" onclick="this.close()">
+              <div class="modal-box p-2 max-w-4xl" onclick="event.stopPropagation()">
+                <img id="modalImg" class="mx-auto modal-img rounded shadow" src="" alt="Full Image" />
+                <div class="text-center mt-4">
+                  <button onclick="imgModal.close()" class="btn">Close</button>
+                </div>
+              </div>
+            </dialog>
+            <div class="modal-action mt-6">
+              <button class="btn" onclick="viewModal.close()">Close</button>
+              <button class="btn btn-primary" onclick="toggleEditForm(true)">Edit</button>
+            </div>
             <h3 class="text-xl font-bold mb-2" id="viewSummary"></h3>
             <p class="text-sm text-gray-500">Issue #: <span id="viewIssueNumber"></span></p>
             <p class="text-sm text-gray-600" id="viewMeta"></p>
@@ -165,18 +190,6 @@
                 max-height: 80vh;
               }
             </style>
-            <dialog id="imgModal" class="modal" onclick="this.close()">
-              <div class="modal-box p-2 max-w-4xl" onclick="event.stopPropagation()">
-                <img id="modalImg" class="mx-auto modal-img rounded shadow" src="" alt="Full Image" />
-                <div class="text-center mt-4">
-                  <button onclick="imgModal.close()" class="btn">Close</button>
-                </div>
-              </div>
-            </dialog>
-            <div class="modal-action mt-6">
-              <button class="btn" onclick="viewModal.close()">Close</button>
-              <button class="btn btn-primary" onclick="toggleEditForm(true)">Edit</button>
-            </div>
           </div>
           <form id="editForm" class="space-y-4 hidden">
             <p class="text-sm text-gray-500">Issue #: <span id="editIssueNumber"></span></p>
@@ -209,30 +222,53 @@
               <button type="submit" class="btn btn-primary">Save</button>
             </div>
           </form>
+          <!-- Comments Section -->
+          <div class="mt-6">
+            <h4 class="text-lg font-bold mb-2">Comments</h4>
+            <div id="commentList" class="space-y-2 mb-4"></div>
+            <div class="flex gap-2">
+              <input id="newCommentInput" list="userSuggestions" type="text" placeholder="Write a comment..."
+                class="input input-bordered flex-1" />
+              <button id="addCommentBtn" class="btn btn-primary">Add</button>
+            </div>
+          </div>
+
         </div>
       </dialog>
     </div>
   </div>
-
   <!-- Full App Script -->
   <script>
 
     (async function () {
       await initSupabaseFromConfig();
-
       if (!supa) {
         alert('Could not initialize Supabase config');
         return;
       }
 
-      // Only after Supabase is ready
       const saved = localStorage.getItem('qa_user');
       if (saved) {
         currentUser = JSON.parse(saved);
-        updateAuthUI(); // ← this will safely call loadIssues() now
+        updateAuthUI(); // ✅ safe now
       }
     })();
 
+    let allUsernames = [];
+
+    async function fetchUsernames() {
+      const { data, error } = await supa.from('users').select('username');
+      if (!error && data) {
+        allUsernames = data.map(u => u.username);
+        const suggestionList = document.getElementById('userSuggestions');
+        suggestionList.innerHTML = '';
+        allUsernames.forEach(username => {
+          const option = document.createElement('option');
+          option.value = `@${username}`;
+          suggestionList.appendChild(option);
+        });
+      }
+    }
 
 
     let createQuill, editQuill;
@@ -309,67 +345,75 @@
         });
       }
 
-      const saved = localStorage.getItem('qa_user');
-      if (saved) {
-        currentUser = JSON.parse(saved);
-        updateAuthUI();
-      }
-
       document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
+        e.preventDefault();
 
-  const remember = document.getElementById('rememberMe').checked;
-  const emailField = document.getElementById('loginEmail');
-  const passwordField = document.getElementById('loginPassword');
-  const email = emailField.value.trim();
-  const password = passwordField.value;
+        const remember = document.getElementById('rememberMe').checked;
+        const emailField = document.getElementById('loginEmail');
+        const passwordField = document.getElementById('loginPassword');
+        const email = emailField.value.trim();
+        const password = passwordField.value;
 
-  if (remember) {
-    localStorage.setItem('qa_saved_email', email);
-    localStorage.setItem('qa_saved_password', password);
-  } else {
-    localStorage.removeItem('qa_saved_email');
-    localStorage.removeItem('qa_saved_password');
-  }
+        if (remember) {
+          localStorage.setItem('qa_saved_email', email);
+          localStorage.setItem('qa_saved_password', password);
+        } else {
+          localStorage.removeItem('qa_saved_email');
+          localStorage.removeItem('qa_saved_password');
+        }
 
-  try {
-    const { data, error } = await supa.from('users').select('*').eq('email', email);
+        try {
+          const { data, error } = await supa.from('users').select('*').eq('email', email);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return showToast('Login failed', 'error');
-    }
+          if (error) {
+            console.error('Supabase error:', error);
+            return showToast('Login failed', 'error');
+          }
 
-    if (!data || data.length === 0) {
-      console.warn('No matching user found');
-      return showToast('User not found', 'error');
-    }
+          if (!data || data.length === 0) {
+            console.warn('No matching user found');
+            return showToast('User not found', 'error');
+          }
 
-    const user = data[0];
+          const user = data[0];
 
-    if (!user.password_hash) {
-      console.error('Missing password_hash for user:', user);
-      return showToast('Invalid user credentials', 'error');
-    }
+          if (!user.password_hash) {
+            console.error('Missing password_hash for user:', user);
+            return showToast('Invalid user credentials', 'error');
+          }
 
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
-      console.warn('Incorrect password');
-      return showToast('Incorrect password', 'error');
-    }
+          const valid = await bcrypt.compare(password, user.password_hash);
+          if (!valid) {
+            console.warn('Incorrect password');
+            return showToast('Incorrect password', 'error');
+          }
 
-    // ✅ Success
-    currentUser = user;
-    localStorage.setItem('qa_user', JSON.stringify(user));
-    showToast('Login successful');
-    updateAuthUI();
+          // ✅ Success
+          currentUser = user;
+          localStorage.setItem('qa_user', JSON.stringify(user));
+          showToast('Login successful');
+          updateAuthUI();
 
-  } catch (err) {
-    console.error('Unexpected login error:', err);
-    showToast('Unexpected login error', 'error');
-  }
-});
+        } catch (err) {
+          console.error('Unexpected login error:', err);
+          showToast('Unexpected login error', 'error');
+        }
+      });
 
+      (async function () {
+        await initSupabaseFromConfig();
+        if (!supa) {
+          alert('Could not initialize Supabase config');
+          return;
+        }
+
+        const saved = localStorage.getItem('qa_user');
+        if (saved) {
+          currentUser = JSON.parse(saved);
+          updateAuthUI();
+          fetchUsernames(); // ✅ safe here because supa is ready
+        }
+      })();
 
       document.getElementById('logoutBtn').addEventListener('click', () => {
         localStorage.removeItem('qa_user');
@@ -492,6 +536,7 @@
       document.getElementById('viewTags').textContent = issue.tags || '';
       document.getElementById('viewCreatedBy').textContent = issue.created_by;
 
+
       const viewImgs = document.getElementById('viewImages');
       viewImgs.innerHTML = '';
       (issue.image_urls || []).forEach(url => {
@@ -539,12 +584,18 @@
 
       editRemovedImages = new Set();
       viewModal.showModal();
+      loadComments(issue.id);
     }
 
     function toggleEditForm(show) {
-      document.getElementById('viewMode').classList.toggle('hidden', show);
-      document.getElementById('editForm').classList.toggle('hidden', !show);
+      const viewMode = document.getElementById('viewMode');
+      const editForm = document.getElementById('editForm');
+      if (!viewMode || !editForm) return; // ✅ prevent crashing
+
+      viewMode.classList.toggle('hidden', show);
+      editForm.classList.toggle('hidden', !show);
     }
+
 
     function updateAuthUI() {
       const auth = document.getElementById('authSection');
@@ -667,6 +718,180 @@
 
       updateStatusCounts(issueList);
     }
+
+    async function loadComments(issueId) {
+      const { data: allComments, error } = await supa
+        .from('comments')
+        .select('*')
+        .eq('issue_id', issueId)
+        .order('created_at', { ascending: true });
+
+      const commentList = document.getElementById('commentList');
+      commentList.innerHTML = '';
+
+      if (error) {
+        commentList.innerHTML = '<p class="text-red-500">Failed to load comments.</p>';
+        return;
+      }
+
+      // Build comment tree
+      const commentMap = {};
+      allComments.forEach(c => (commentMap[c.id] = { ...c, children: [] }));
+      const rootComments = [];
+
+      allComments.forEach(c => {
+        if (c.parent_id) {
+          commentMap[c.parent_id]?.children.push(commentMap[c.id]);
+        } else {
+          rootComments.push(commentMap[c.id]);
+        }
+      });
+
+      // Render
+      rootComments.forEach(comment => {
+        commentList.appendChild(renderCommentThread(comment));
+      });
+
+      setupCommentButtons(); // still works for all
+    }
+
+
+    function setupCommentButtons() {
+      document.querySelectorAll('.edit-comment-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          const input = document.querySelector(`.comment-input[data-id="${id}"]`);
+          if (input.readOnly) {
+            input.readOnly = false;
+            input.focus();
+            btn.textContent = '💾';
+          } else {
+            input.readOnly = true;
+            const updatedText = input.value.trim();
+            await supa.from('comments').update({ text: updatedText }).eq('id', id);
+            btn.textContent = '✏️';
+            showToast('Comment updated');
+          }
+        };
+      });
+
+      document.querySelectorAll('.delete-comment-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          await supa.from('comments').delete().eq('id', id);
+          showToast('Comment deleted');
+          loadComments(document.getElementById('editForm').editId.value);
+        };
+      });
+    }
+
+    document.getElementById('addCommentBtn').addEventListener('click', async () => {
+      const input = document.getElementById('newCommentInput');
+      const text = input.value.trim();
+      const issueId = document.getElementById('editForm').editId.value;
+
+      if (!text) return;
+
+      await supa.from('comments').insert([{
+        issue_id: issueId,
+        text,
+        created_by: currentUser.username
+      }]);
+
+      input.value = '';
+      showToast('Comment added');
+      loadComments(issueId);
+    });
+
+    function renderCommentThread(comment) {
+      const div = document.createElement('div');
+      div.className = 'comment-block bg-gray-100 p-3 rounded mb-2';
+
+      div.innerHTML = `
+    <div>
+      <p class="text-sm font-semibold mb-1">${comment.created_by}</p>
+      <input type="text" value="${comment.text}" 
+        class="input input-sm w-full mb-1 comment-input" 
+        data-id="${comment.id}" readonly>
+      <p class="text-xs text-gray-500">${new Date(comment.created_at).toLocaleString()}</p>
+      <div class="flex gap-2 mt-1">
+        <button class="btn btn-xs btn-outline edit-comment-btn" data-id="${comment.id}">✏️</button>
+        <button class="btn btn-xs btn-outline btn-error delete-comment-btn" data-id="${comment.id}">🗑️</button>
+        <button class="btn btn-xs btn-outline reply-btn" data-id="${comment.id}">↩️ Reply</button>
+        ${comment.children?.length ? `<button class="btn btn-xs btn-outline toggle-replies-btn" data-id="${comment.id}">Show replies (${comment.children.length})</button>` : ''}
+      </div>
+      <div class="reply-input mt-2 hidden transition-all duration-300 ease-in-out">
+        <input type="text" class="input input-sm w-full mb-1 reply-text" placeholder="Write a reply..." list="userSuggestions" />
+        <button class="btn btn-xs btn-primary post-reply-btn" data-parent="${comment.id}">Post</button>
+      </div>
+    </div>
+  `;
+
+      if (comment.children && comment.children.length) {
+        const childContainer = document.createElement('div');
+        childContainer.className = 'child-comments ml-6 mt-2 slide-toggle';
+        comment.children.forEach(child => {
+          childContainer.appendChild(renderCommentThread(child));
+        });
+        div.appendChild(childContainer);
+      }
+
+      return div;
+    }
+
+
+
+    document.addEventListener('click', async (e) => {
+      // Toggle reply input box
+      if (e.target.classList.contains('reply-btn')) {
+        const commentContainer = e.target.closest('.comment-block');
+        const replyBox = commentContainer?.querySelector('.reply-input');
+        if (replyBox) {
+          replyBox.classList.toggle('hidden');
+          if (!replyBox.classList.contains('hidden')) {
+            replyBox.querySelector('.reply-text').focus(); // Autofocus
+          }
+        }
+        return;
+      }
+
+      // Post reply
+      if (e.target.classList.contains('post-reply-btn')) {
+        const parentId = e.target.dataset.parent;
+        const replyBox = e.target.closest('.reply-input');
+        const textInput = replyBox?.querySelector('.reply-text');
+        const text = textInput?.value.trim();
+        const issueId = document.getElementById('editForm').editId.value;
+
+        if (!text) return;
+
+        await supa.from('comments').insert([{
+          issue_id: issueId,
+          parent_id: parentId,
+          text,
+          created_by: currentUser.username
+        }]);
+
+        showToast('Reply added');
+        loadComments(issueId);
+      }
+
+      // Toggle show/hide child replies
+      if (e.target.classList.contains('toggle-replies-btn')) {
+        const commentContainer = e.target.closest('.comment-block');
+        const childBox = commentContainer?.querySelector('.child-comments');
+        if (childBox) {
+          childBox.classList.toggle('open');
+          const count = childBox.children.length;
+          e.target.textContent = childBox.classList.contains('open')
+            ? 'Hide replies'
+            : `Show replies (${count})`;
+
+        }
+      }
+
+    });
+
   </script>
 </body>
 
