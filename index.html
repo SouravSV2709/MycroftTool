@@ -142,6 +142,8 @@
               <option>Ready for QA</option>
               <option>Closed</option>
             </select>
+            <select id="tagFilter" class="select select-sm max-w-xs" multiple>
+            </select>
           </div>
           <div>
             <button id="clearFiltersBtn" class="btn btn-sm btn-outline mt-2 md:mt-0">Clear Filters</button>
@@ -426,10 +428,19 @@
         document.getElementById(id).addEventListener('change', applyFilters);
       });
 
+      document.getElementById('tagFilter').addEventListener('change', applyFilters);
+
       document.getElementById('clearFiltersBtn').addEventListener('click', () => {
-        ['filterInput', 'filterType', 'filterPriority', 'filterStatus'].forEach(id => document.getElementById(id).value = '');
+        ['filterInput', 'filterType', 'filterPriority', 'filterStatus'].forEach(id => {
+          document.getElementById(id).value = '';
+        });
+
+        // Clear all tag selections
+        Array.from(document.getElementById('tagFilter').options).forEach(opt => opt.selected = false);
+
         applyFilters();
       });
+
 
       document.getElementById('imageInput').addEventListener('change', function (e) {
         const preview = document.getElementById('preview');
@@ -633,6 +644,20 @@
       const priority = document.getElementById('filterPriority').value;
       const status = document.getElementById('filterStatus').value;
 
+      const tagFilter = document.getElementById('tagFilter');
+const selectedTagValues = Array.from(tagFilter.selectedOptions).map(opt => opt.value);
+
+// Deselect "All Tags" if other tags are also selected
+if (selectedTagValues.includes("") && selectedTagValues.length > 1) {
+  Array.from(tagFilter.options).forEach(opt => {
+    if (opt.value === "") opt.selected = false;
+  });
+}
+
+// Final filtered tag values (ignore empty string)
+const selectedTags = selectedTagValues.filter(Boolean);
+
+
       let filtered = allIssues.filter(issue => (
         (!keyword || (issue.issue_number || '').toLowerCase().includes(keyword)) &&
         (!type || issue.type === type) &&
@@ -649,6 +674,15 @@
       } else if (currentSort === 'created_asc') {
         filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       }
+
+if (selectedTags.length > 0) {
+  filtered = filtered.filter(issue => {
+    const issueTags = issue.tags?.split(',').map(t => t.trim()) || [];
+    return selectedTags.some(tag => issueTags.includes(tag)); // OR logic
+  });
+}
+
+
 
       renderIssues(filtered);
     }
@@ -671,8 +705,26 @@
       const { data: issues, error } = await supa.from('issues').select('*').order('created_at', { ascending: false });
       if (error) return showToast('Error loading issues', 'error');
       allIssues = issues;
+
+      const uniqueTags = new Set();
+      issues.forEach(issue => {
+        if (issue.tags) {
+          issue.tags.split(',').map(tag => tag.trim()).forEach(tag => uniqueTags.add(tag));
+        }
+      });
+
+      const tagFilter = document.getElementById('tagFilter');
+      tagFilter.innerHTML = '<option value="">All Tags</option>';
+      [...uniqueTags].sort().forEach(tag => {
+        const opt = document.createElement('option');
+        opt.value = tag;
+        opt.textContent = tag;
+        tagFilter.appendChild(opt);
+      });
+
       applyFilters();
     }
+
 
     function getRandomColor() {
       // Generate a random hex color code
@@ -696,7 +748,7 @@
         const tags = issue.tags ? issue.tags.split(',').map(tag => tag.trim()) : [];
         const tagsHtmlParts = await Promise.all(tags.map(async tag => {
           const color = await getColorForTag(tag);
-          return `<span class="badge" style="background-color: ${color}; color: white; margin-right: 0.5rem;">${tag}</span>`;
+          return `<span class="badge cursor-pointer filter-tag" data-tag="${tag}" style="background-color: ${color}; color: white; margin-right: 0.5rem;">${tag}</span>`;
         }));
         const tagsHtml = tagsHtmlParts.join(' ');
 
@@ -716,6 +768,31 @@
       }
 
       updateStatusCounts(issueList);
+
+
+      document.querySelectorAll('.filter-tag').forEach(el => {
+        el.addEventListener('click', e => {
+          e.stopPropagation();
+
+          const tag = el.dataset.tag;
+          const tagFilter = document.getElementById('tagFilter');
+
+          // Check if already selected
+          const alreadySelected = Array.from(tagFilter.selectedOptions).some(opt => opt.value === tag);
+
+          // Select or deselect
+          Array.from(tagFilter.options).forEach(opt => {
+            if (opt.value === tag) {
+              opt.selected = !alreadySelected;
+            }
+          });
+
+          applyFilters();
+        });
+      });
+
+
+
     }
 
     async function loadComments(issueId) {
@@ -890,7 +967,6 @@
       }
 
     });
-
   </script>
 </body>
 
