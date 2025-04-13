@@ -509,18 +509,14 @@
         const imageUrls = await uploadImages(form.images.files);
         const assignee = formData.get('assignee');
         // Get latest issue_number
-        const { data: latest, error: latestErr } = await supa
-          .from('issues')
-          .select('issue_number')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        let nextNumber = 1;
-        if (latest && latest.length > 0 && latest[0].issue_number) {
-          const lastNum = parseInt(latest[0].issue_number.replace('MT-', ''), 10);
-          nextNumber = lastNum + 1;
+        const { data: nextNumber, error: rpcError } = await supa.rpc('increment_issue_number');
+        if (rpcError || !nextNumber) {
+          showToast('Failed to get next issue number', 'error');
+          return;
         }
+
         const issueNumber = `MT-${nextNumber.toString().padStart(7, '0')}`;
+
 
         const newIssue = {
           issue_number: issueNumber,
