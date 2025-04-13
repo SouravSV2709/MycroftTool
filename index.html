@@ -40,6 +40,7 @@
 <body class="bg-gray-100 min-h-screen">
 
   <datalist id="userSuggestions"></datalist>
+  <datalist id="tagSuggestions"></datalist>
 
   <!-- Toast -->
   <div id="toast" class="hidden alert alert-success shadow-lg w-fit"></div>
@@ -103,7 +104,15 @@
                 <option>High</option>
               </select>
             </div>
-            <input name="tags" placeholder="Tags (comma-separated)" class="input input-bordered w-full" />
+            <div class="relative">
+              <input name="tags" id="tagsInput" placeholder="Tags (comma-separated)" class="input input-bordered w-full"
+                autocomplete="off" />
+            </div>
+
+            <label class="label">Assignee</label>
+            <select name="assignee" class="select select-bordered w-full" id="assigneeCreate">
+              <option value="">Unassigned</option>
+            </select>
             <input type="file" id="imageInput" name="images" multiple accept="image/*"
               class="file-input file-input-bordered w-full" />
             <div id="preview" class="flex flex-wrap gap-2"></div>
@@ -115,53 +124,59 @@
         </div>
       </dialog>
 
-
-      <!-- Filters -->
+      <!-- Filters Section (Refined Layout) -->
       <section class="bg-white p-6 rounded-xl shadow mb-6">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" id="statusCounts"></div>
-        <div class="grid grid-cols-3 gap-4 mb-4" id="typeCounts"></div>
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
-            <input type="text" id="filterInput" placeholder="Search by summary or tag..."
-              class="input input-bordered w-full" />
-            <select id="filterType" class="select select-bordered w-full">
-              <option value="">All Types</option>
-              <option>Bug</option>
-              <option>Improvement</option>
-              <option>Test</option>
-            </select>
-            <select id="filterPriority" class="select select-bordered w-full">
-              <option value="">All Priorities</option>
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-            </select>
-            <select id="filterStatus" class="select select-bordered w-full">
-              <option value="">All Statuses</option>
-              <option>Open</option>
-              <option>In development</option>
-              <option>Ready for QA</option>
-              <option>Closed</option>
-            </select>
-            <select id="tagFilter" class="select select-sm max-w-xs" multiple>
-            </select>
-          </div>
-          <div>
-            <button id="clearFiltersBtn" class="btn btn-sm btn-outline mt-2 md:mt-0">Clear Filters</button>
-          </div>
-          <div class="flex gap-4 items-center">
-            <label class="label-text">Sort by:</label>
-            <select id="sortSelect" class="select select-bordered">
-              <option value="">None</option>
-              <option value="tag_asc">Tag (A-Z)</option>
-              <option value="tag_desc">Tag (Z-A)</option>
-              <option value="created_asc">Created Date (Oldest)</option>
-              <option value="created_desc">Created Date (Newest)</option>
-            </select>
+        <!-- Status & Type Counts -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="statusCounts"></div>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6" id="typeCounts"></div>
 
+        <!-- Filters -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end mb-6">
+          <input type="text" id="filterInput" placeholder="Search by summary or tag..."
+            class="input input-bordered col-span-12 lg:col-span-3" />
+          <select id="filterType" class="select select-bordered col-span-6 lg:col-span-2">
+            <option value="">All Types</option>
+            <option>Bug</option>
+            <option>Improvement</option>
+            <option>Test</option>
+          </select>
+          <select id="filterPriority" class="select select-bordered col-span-6 lg:col-span-2">
+            <option value="">All Priorities</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+          <select id="filterStatus" class="select select-bordered col-span-6 lg:col-span-2">
+            <option value="">All Statuses</option>
+            <option>Open</option>
+            <option>In development</option>
+            <option>Ready for QA</option>
+            <option>Closed</option>
+          </select>
+          <select id="filterAssignee" class="select select-bordered col-span-6 lg:col-span-3">
+            <option value="">All Assignees</option>
+          </select>
+          <select id="tagFilter" class="select select-bordered col-span-12 lg:col-span-6" multiple></select>
+
+          <!-- Buttons & Sort -->
+          <div class="flex flex-wrap gap-2 col-span-12 justify-between items-center mt-2">
+            <button id="clearFiltersBtn" class="btn btn-sm btn-outline">Clear Filters</button>
+            <div class="flex gap-2 items-center">
+              <label class="label-text">Sort by:</label>
+              <select id="sortSelect" class="select select-bordered">
+                <option value="">None</option>
+                <option value="tag_asc">Tag (A-Z)</option>
+                <option value="tag_desc">Tag (Z-A)</option>
+                <option value="created_asc">Created Date (Oldest)</option>
+                <option value="created_desc">Created Date (Newest)</option>
+                <option value="issue_number_asc" selected>Issue Number (Ascending)</option>
+                <option value="issue_number_desc">Issue Number (Descending)</option>
+              </select>
+            </div>
           </div>
         </div>
       </section>
+
 
       <!-- Issue List -->
       <div id="issueList" class="space-y-2"></div>
@@ -187,6 +202,7 @@
             <p class="text-sm text-gray-600" id="viewMeta"></p>
             <div class="prose max-w-none mt-4" id="viewDescription"></div>
             <p class="mt-4"><strong>Tags:</strong> <span id="viewTags"></span></p>
+            <p><strong>Assignee:</strong> <span id="viewAssignee"></span></p> <!-- NEW -->
             <p class="text-sm text-gray-400 mt-2">Created by: <span id="viewCreatedBy"></span></p>
             <div class="flex flex-wrap gap-2 mt-4" id="viewImages"></div>
             <!-- Updated view images with click to enlarge -->
@@ -199,26 +215,41 @@
           <form id="editForm" class="space-y-4 hidden">
             <p class="text-sm text-gray-500">Issue #: <span id="editIssueNumber"></span></p>
             <input type="hidden" name="editId" />
+            <label class="label">Issue Summary</label>
             <input name="summary" placeholder="Summary" class="input input-bordered w-full" required />
+            <label class="label">Issue Description</label>
             <div id="editDescEditor" class="quill bg-white"></div>
             <input type="hidden" name="description" required>
+            <label class="label">Issue Type</label>
             <select name="type" class="select select-bordered w-full">
               <option>Bug</option>
               <option>Improvement</option>
               <option>Test</option>
             </select>
+            <label class="label">Priority</label>
             <select name="priority" class="select select-bordered w-full">
               <option>Low</option>
               <option>Medium</option>
               <option>High</option>
             </select>
+            <label class="label">Status</label>
             <select name="status" class="select select-bordered w-full">
               <option>Open</option>
               <option>In development</option>
               <option>Ready for QA</option>
               <option>Closed</option>
             </select>
-            <input name="tags" placeholder="Tags" class="input input-bordered w-full" />
+            <label class="label">Tags</label>
+            <div class="relative">
+              <input name="tags" id="editFormTagsInput" placeholder="Tags (comma-separated)"
+                class="input input-bordered w-full" autocomplete="off" />
+            </div>
+            <div>
+              <label class="label">Assignee</label>
+              <select name="assignee" class="select select-bordered w-full" id="assigneeEdit">
+                <option value="">Unassigned</option>
+              </select>
+            </div>
             <input type="file" id="editImageInput" name="editImages" multiple accept="image/*"
               class="file-input file-input-bordered w-full" />
             <div id="editPreview" class="flex flex-wrap gap-2"></div>
@@ -242,6 +273,16 @@
       </dialog>
     </div>
   </div>
+
+  <!-- Scroll to Top Button -->
+  <button id="scrollTopBtn"
+    class="fixed bottom-16 right-16 bg-primary text-white p-3 rounded-full shadow-lg hover:bg-primary-focus transition hidden z-50"
+    title="Go to top">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mx-auto" fill="none" viewBox="0 0 24 24"
+      stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+    </svg>
+  </button>
   <!-- Full App Script -->
   <script>
 
@@ -280,6 +321,7 @@
     let currentUser = null;
     let allIssues = [];
     let editRemovedImages = new Set();
+    let uniqueTags = new Set();
 
     // Cache to avoid repeat DB calls
     const tagColorMap = {};
@@ -426,7 +468,7 @@
         showToast('Logged out');
       });
 
-      ['filterInput', 'filterType', 'filterPriority', 'filterStatus'].forEach(id => {
+      ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee'].forEach(id => {
         document.getElementById(id).addEventListener('input', applyFilters);
         document.getElementById(id).addEventListener('change', applyFilters);
       });
@@ -434,7 +476,7 @@
       document.getElementById('tagFilter').addEventListener('change', applyFilters);
 
       document.getElementById('clearFiltersBtn').addEventListener('click', () => {
-        ['filterInput', 'filterType', 'filterPriority', 'filterStatus'].forEach(id => {
+        ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee'].forEach(id => {
           document.getElementById(id).value = '';
         });
 
@@ -465,6 +507,7 @@
         const form = e.target;
         const formData = new FormData(form);
         const imageUrls = await uploadImages(form.images.files);
+        const assignee = formData.get('assignee');
         // Get latest issue_number
         const { data: latest, error: latestErr } = await supa
           .from('issues')
@@ -488,6 +531,7 @@
           status: 'Open',
           tags: formData.get('tags'),
           image_urls: imageUrls,
+          assignee: assignee || null,
           created_by: currentUser.username
         };
         const { error } = await supa.from('issues').insert([newIssue]);
@@ -503,6 +547,7 @@
         const form = e.target;
         const id = form.editId.value;
         const formData = new FormData(form);
+        const assignee = formData.get('assignee');
         const newImageUrls = await uploadImages(form.editImages.files);
         const existingUrls = Array.from(document.getElementById('editPreview').querySelectorAll('img'))
           .map(img => img.src)
@@ -518,6 +563,7 @@
           priority: formData.get('priority'),
           status: formData.get('status'),
           tags: formData.get('tags'),
+          assignee: assignee || null,
           image_urls: [...existingUrls, ...newImageUrls]
         };
         await supa.from('issues').update(updated).eq('id', id);
@@ -527,6 +573,55 @@
         loadIssues();
       });
     });
+
+    // Load Assignee dropdown with usernames //
+
+    async function populateAssigneeDropdowns() {
+      const { data, error } = await supa.from('users').select('username');
+      if (!data || error) return;
+
+      const createSelect = document.getElementById('assigneeCreate');
+      const editSelect = document.getElementById('assigneeEdit');
+      const filterSelect = document.getElementById('filterAssignee'); // ✅ NEW
+
+      createSelect.innerHTML = '<option value="">Unassigned</option>';
+      editSelect.innerHTML = '<option value="">Unassigned</option>';
+      filterSelect.innerHTML = '<option value="">All Assignees</option>'; // ✅ default option
+
+      data.forEach(user => {
+        const username = user.username;
+
+        [createSelect, editSelect].forEach(select => {
+          const opt = document.createElement('option');
+          opt.value = username;
+          opt.textContent = username;
+          select.appendChild(opt);
+        });
+
+        // ✅ Add to Assignee Filter dropdown
+        const filterOpt = document.createElement('option');
+        filterOpt.value = username;
+        filterOpt.textContent = username;
+        filterSelect.appendChild(filterOpt);
+      });
+    }
+
+    (async function () {
+      await initSupabaseFromConfig();
+      if (!supa) {
+        alert('Could not initialize Supabase config');
+        return;
+      }
+
+      const saved = localStorage.getItem('qa_user');
+      if (saved) {
+        currentUser = JSON.parse(saved);
+        await fetchUsernames();              // ✅ safe now
+        await populateAssigneeDropdowns();   // ✅ also safe here
+        updateAuthUI();
+      }
+    })();
+
 
     async function uploadImages(files) {
       const uploadedUrls = [];
@@ -548,6 +643,8 @@
       document.getElementById('viewDescription').innerHTML = issue.description || '';
       document.getElementById('viewTags').textContent = issue.tags || '';
       document.getElementById('viewCreatedBy').textContent = issue.created_by;
+      document.getElementById('viewAssignee').textContent = issue.assignee || "Unassigned";
+
 
 
       const viewImgs = document.getElementById('viewImages');
@@ -572,6 +669,7 @@
       form.priority.value = issue.priority;
       form.status.value = issue.status;
       form.tags.value = issue.tags || '';
+      form.assignee.value = issue.assignee || "";
 
       const editPreview = document.getElementById('editPreview');
       editPreview.innerHTML = '';
@@ -624,6 +722,7 @@
       }
     }
 
+
     function showToast(msg, type = 'success') {
       const toast = document.getElementById('toast');
       toast.textContent = msg;
@@ -634,7 +733,7 @@
 
     //Sorting the items
 
-    let currentSort = '';
+    let currentSort = 'issue_number_asc';
     document.getElementById('sortSelect').addEventListener('change', (e) => {
       currentSort = e.target.value;
       applyFilters(); // re-render
@@ -646,6 +745,7 @@
       const type = document.getElementById('filterType').value;
       const priority = document.getElementById('filterPriority').value;
       const status = document.getElementById('filterStatus').value;
+      const assignee = document.getElementById('filterAssignee').value;
 
       const tagFilter = document.getElementById('tagFilter');
       const selectedTagValues = Array.from(tagFilter.selectedOptions).map(opt => opt.value);
@@ -666,6 +766,7 @@
         (!type || issue.type === type) &&
         (!priority || issue.priority === priority) &&
         (!status || issue.status === status) &&
+        (!assignee || issue.assignee === assignee) &&
         (!keyword || issue.summary.toLowerCase().includes(keyword) || (issue.tags || '').toLowerCase().includes(keyword))
       ));
 
@@ -679,6 +780,20 @@
       } else if (currentSort === 'created_desc') {
         filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       }
+      else if (currentSort === 'issue_number_asc') {
+        filtered.sort((a, b) => {
+          const aNum = parseInt((a.issue_number || '').replace(/\D/g, '').padStart(6, '0'), 10);
+          const bNum = parseInt((b.issue_number || '').replace(/\D/g, '').padStart(6, '0'), 10);
+          return aNum - bNum;
+        });
+      } else if (currentSort === 'issue_number_desc') {
+        filtered.sort((a, b) => {
+          const aNum = parseInt((a.issue_number || '').replace(/\D/g, '').padStart(6, '0'), 10);
+          const bNum = parseInt((b.issue_number || '').replace(/\D/g, '').padStart(6, '0'), 10);
+          return bNum - aNum;
+        });
+      }
+
 
 
 
@@ -733,7 +848,7 @@
       if (error) return showToast('Error loading issues', 'error');
       allIssues = issues;
 
-      const uniqueTags = new Set();
+      uniqueTags = new Set();
       issues.forEach(issue => {
         if (issue.tags) {
           issue.tags.split(',').map(tag => tag.trim()).forEach(tag => uniqueTags.add(tag));
@@ -741,16 +856,31 @@
       });
 
       const tagFilter = document.getElementById('tagFilter');
-      tagFilter.innerHTML = '<option value="">All Tags</option>';
-      [...uniqueTags].sort().forEach(tag => {
-        const opt = document.createElement('option');
-        opt.value = tag;
-        opt.textContent = tag;
-        tagFilter.appendChild(opt);
-      });
+      const tagSuggestions = document.getElementById('tagSuggestions');
+      tagSuggestions.innerHTML = '';
+      tagFilter.innerHTML = ''; // ✅ ADD THIS LINE
 
+      [...uniqueTags].sort().forEach(tag => {
+        // For tag input datalist
+        const opt1 = document.createElement('option');
+        opt1.value = tag;
+        tagSuggestions.appendChild(opt1);
+
+        // For tag filter dropdown
+        const opt2 = document.createElement('option');
+        opt2.value = tag;
+        opt2.textContent = tag;
+        tagFilter.appendChild(opt2);
+      });
       applyFilters();
+
+      enableMultiTagAutocomplete('tagsInput');
+      enableMultiTagAutocomplete('editFormTagsInput');
     }
+
+
+
+
 
 
     function getRandomColor() {
@@ -995,7 +1125,78 @@
       }
 
     });
+
+    // Scroll to Top button logic
+    const scrollTopBtn = document.getElementById('scrollTopBtn');
+
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 200) {
+        scrollTopBtn.classList.remove('hidden');
+      } else {
+        scrollTopBtn.classList.add('hidden');
+      }
+    });
+
+    scrollTopBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    function enableMultiTagAutocomplete(inputId) {
+      const input = document.getElementById(inputId);
+      const wrapper = input.parentElement;
+
+      // Remove old dropdown if exists
+      const oldDropdown = wrapper.querySelector('.autocomplete-dropdown');
+      if (oldDropdown) oldDropdown.remove();
+
+      // Create dropdown container
+      const dropdown = document.createElement('div');
+      dropdown.className = 'autocomplete-dropdown absolute z-50 bg-white border border-gray-300 rounded w-full max-h-40 overflow-auto shadow';
+      dropdown.style.display = 'none';
+      wrapper.style.position = 'relative';
+      wrapper.appendChild(dropdown);
+
+      input.addEventListener('input', () => {
+        const rawValue = input.value;
+        const parts = rawValue.split(',').map(p => p.trim());
+        const last = parts[parts.length - 1].toLowerCase();
+
+        dropdown.innerHTML = '';
+        const matches = [...uniqueTags].filter(tag =>
+          tag.toLowerCase().startsWith(last) && !parts.includes(tag)
+        );
+
+        if (matches.length === 0 || last === '') {
+          dropdown.style.display = 'none';
+          return;
+        }
+
+        matches.forEach(tag => {
+          const option = document.createElement('div');
+          option.className = 'px-3 py-2 hover:bg-gray-100 cursor-pointer';
+          option.textContent = tag;
+          option.onclick = () => {
+            parts[parts.length - 1] = tag;
+            input.value = parts.join(', ') + ', ';
+            dropdown.style.display = 'none';
+          };
+          dropdown.appendChild(option);
+        });
+
+        dropdown.style.display = 'block';
+      });
+
+      // Hide dropdown on blur
+      input.addEventListener('blur', () => {
+        setTimeout(() => dropdown.style.display = 'none', 200);
+      });
+    }
+
+
+
+
   </script>
+
 </body>
 
 </html>
