@@ -711,6 +711,12 @@
         auth.classList.add('hidden');
         app.classList.remove('hidden');
         document.getElementById('currentUserDisplay').textContent = `${currentUser.username} (${currentUser.email})`;
+
+        // ✅ Set default filterAssignee to logged-in user
+        const assigneeFilter = document.getElementById('filterAssignee');
+        if (assigneeFilter) {
+          assigneeFilter.value = currentUser.username;
+        }
         loadIssues();
       } else {
         auth.classList.remove('hidden');
