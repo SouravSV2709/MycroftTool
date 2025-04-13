@@ -153,10 +153,12 @@
             <label class="label-text">Sort by:</label>
             <select id="sortSelect" class="select select-bordered">
               <option value="">None</option>
-              <option value="tag">Tag (A-Z)</option>
-              <option value="created_desc">Created Date (Newest)</option>
+              <option value="tag_asc">Tag (A-Z)</option>
+              <option value="tag_desc">Tag (Z-A)</option>
               <option value="created_asc">Created Date (Oldest)</option>
+              <option value="created_desc">Created Date (Newest)</option>
             </select>
+
           </div>
         </div>
       </section>
@@ -668,13 +670,17 @@
       ));
 
       // 🔽 Sorting
-      if (currentSort === 'tag') {
+      if (currentSort === 'tag_asc') {
         filtered.sort((a, b) => (a.tags || '').localeCompare(b.tags || ''));
-      } else if (currentSort === 'created_desc') {
-        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      } else if (currentSort === 'tag_desc') {
+        filtered.sort((a, b) => (b.tags || '').localeCompare(a.tags || ''));
       } else if (currentSort === 'created_asc') {
         filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      } else if (currentSort === 'created_desc') {
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       }
+
+
 
       if (selectedTags.length > 0) {
         filtered = filtered.filter(issue => {
