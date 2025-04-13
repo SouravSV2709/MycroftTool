@@ -119,6 +119,7 @@
       <!-- Filters -->
       <section class="bg-white p-6 rounded-xl shadow mb-6">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" id="statusCounts"></div>
+        <div class="grid grid-cols-3 gap-4 mb-4" id="typeCounts"></div>
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
             <input type="text" id="filterInput" placeholder="Search by summary or tag..."
@@ -645,17 +646,17 @@
       const status = document.getElementById('filterStatus').value;
 
       const tagFilter = document.getElementById('tagFilter');
-const selectedTagValues = Array.from(tagFilter.selectedOptions).map(opt => opt.value);
+      const selectedTagValues = Array.from(tagFilter.selectedOptions).map(opt => opt.value);
 
-// Deselect "All Tags" if other tags are also selected
-if (selectedTagValues.includes("") && selectedTagValues.length > 1) {
-  Array.from(tagFilter.options).forEach(opt => {
-    if (opt.value === "") opt.selected = false;
-  });
-}
+      // Deselect "All Tags" if other tags are also selected
+      if (selectedTagValues.includes("") && selectedTagValues.length > 1) {
+        Array.from(tagFilter.options).forEach(opt => {
+          if (opt.value === "") opt.selected = false;
+        });
+      }
 
-// Final filtered tag values (ignore empty string)
-const selectedTags = selectedTagValues.filter(Boolean);
+      // Final filtered tag values (ignore empty string)
+      const selectedTags = selectedTagValues.filter(Boolean);
 
 
       let filtered = allIssues.filter(issue => (
@@ -675,12 +676,12 @@ const selectedTags = selectedTagValues.filter(Boolean);
         filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
       }
 
-if (selectedTags.length > 0) {
-  filtered = filtered.filter(issue => {
-    const issueTags = issue.tags?.split(',').map(t => t.trim()) || [];
-    return selectedTags.some(tag => issueTags.includes(tag)); // OR logic
-  });
-}
+      if (selectedTags.length > 0) {
+        filtered = filtered.filter(issue => {
+          const issueTags = issue.tags?.split(',').map(t => t.trim()) || [];
+          return selectedTags.some(tag => issueTags.includes(tag)); // OR logic
+        });
+      }
 
 
 
@@ -700,6 +701,26 @@ if (selectedTags.length > 0) {
         container.appendChild(badge);
       });
     }
+
+    function updateTypeCounts(issues) {
+      const typeCounts = { Bug: 0, Improvement: 0, Test: 0 };
+      issues.forEach(issue => {
+        if (typeCounts[issue.type] !== undefined) {
+          typeCounts[issue.type]++;
+        }
+      });
+
+      const container = document.getElementById('typeCounts');
+      container.innerHTML = '';
+
+      Object.entries(typeCounts).forEach(([type, count]) => {
+        const badge = document.createElement('div');
+        badge.className = `p-4 rounded-lg shadow text-center border bg-white`;
+        badge.innerHTML = `<p class="text-sm font-semibold">${type}</p><p class="text-xl font-bold">${count}</p>`;
+        container.appendChild(badge);
+      });
+    }
+
 
     async function loadIssues() {
       const { data: issues, error } = await supa.from('issues').select('*').order('created_at', { ascending: false });
@@ -768,6 +789,7 @@ if (selectedTags.length > 0) {
       }
 
       updateStatusCounts(issueList);
+      updateTypeCounts(issueList);
 
 
       document.querySelectorAll('.filter-tag').forEach(el => {
