@@ -88,6 +88,60 @@
         </div>
       </header>
 
+      <!-- Filters Section (Refined Layout) -->
+      <section class="bg-white p-6 rounded-xl shadow mb-6">
+        <!-- Status & Type Counts -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4" id="statusCounts"></div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4" id="typeCounts"></div>
+
+
+        <!-- Filters -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-center mb-4 text-sm">
+          <input type="text" id="filterInput" placeholder="Search by summary or tag..."
+            class="input input-bordered col-span-12 lg:col-span-3" />
+          <select id="filterType" class="select select-bordered col-span-6 lg:col-span-2">
+            <option value="">All Types</option>
+            <option>Bug</option>
+            <option>Improvement</option>
+            <option>Test</option>
+          </select>
+          <select id="filterPriority" class="select select-bordered col-span-6 lg:col-span-2">
+            <option value="">All Priorities</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+          <select id="filterStatus" class="select select-bordered col-span-6 lg:col-span-2">
+            <option value="">All Statuses</option>
+            <option>Open</option>
+            <option>In development</option>
+            <option>Ready for QA</option>
+            <option>Closed</option>
+          </select>
+          <select id="filterAssignee" class="select select-bordered col-span-6 lg:col-span-3">
+            <option value="">All Assignees</option>
+          </select>
+          <select id="tagFilter" class="select select-bordered col-span-12 lg:col-span-6 h-[100px] overflow-auto" multiple></select>
+
+          <!-- Buttons & Sort -->
+          <div class="flex flex-wrap gap-2 col-span-12 justify-between items-center mt-2">
+            <button id="clearFiltersBtn" class="btn btn-sm btn-outline">Clear Filters</button>
+            <div class="flex gap-2 items-center">
+              <label class="label-text">Sort by:</label>
+              <select id="sortSelect" class="select select-bordered">
+                <option value="">None</option>
+                <option value="tag_asc">Tag (A-Z)</option>
+                <option value="tag_desc">Tag (Z-A)</option>
+                <option value="created_asc">Created Date (Oldest)</option>
+                <option value="created_desc">Created Date (Newest)</option>
+                <option value="issue_number_asc" selected>Issue Number (Ascending)</option>
+                <option value="issue_number_desc">Issue Number (Descending)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Issue Form in modal-->
 
       <button id="createIssueBtn" class="btn btn-primary mb-4">Create New Issue</button>
@@ -131,58 +185,6 @@
         </div>
       </dialog>
 
-      <!-- Filters Section (Refined Layout) -->
-      <section class="bg-white p-6 rounded-xl shadow mb-6">
-        <!-- Status & Type Counts -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="statusCounts"></div>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6" id="typeCounts"></div>
-
-        <!-- Filters -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end mb-6">
-          <input type="text" id="filterInput" placeholder="Search by summary or tag..."
-            class="input input-bordered col-span-12 lg:col-span-3" />
-          <select id="filterType" class="select select-bordered col-span-6 lg:col-span-2">
-            <option value="">All Types</option>
-            <option>Bug</option>
-            <option>Improvement</option>
-            <option>Test</option>
-          </select>
-          <select id="filterPriority" class="select select-bordered col-span-6 lg:col-span-2">
-            <option value="">All Priorities</option>
-            <option>Low</option>
-            <option>Medium</option>
-            <option>High</option>
-          </select>
-          <select id="filterStatus" class="select select-bordered col-span-6 lg:col-span-2">
-            <option value="">All Statuses</option>
-            <option>Open</option>
-            <option>In development</option>
-            <option>Ready for QA</option>
-            <option>Closed</option>
-          </select>
-          <select id="filterAssignee" class="select select-bordered col-span-6 lg:col-span-3">
-            <option value="">All Assignees</option>
-          </select>
-          <select id="tagFilter" class="select select-bordered col-span-12 lg:col-span-6" multiple></select>
-
-          <!-- Buttons & Sort -->
-          <div class="flex flex-wrap gap-2 col-span-12 justify-between items-center mt-2">
-            <button id="clearFiltersBtn" class="btn btn-sm btn-outline">Clear Filters</button>
-            <div class="flex gap-2 items-center">
-              <label class="label-text">Sort by:</label>
-              <select id="sortSelect" class="select select-bordered">
-                <option value="">None</option>
-                <option value="tag_asc">Tag (A-Z)</option>
-                <option value="tag_desc">Tag (Z-A)</option>
-                <option value="created_asc">Created Date (Oldest)</option>
-                <option value="created_desc">Created Date (Newest)</option>
-                <option value="issue_number_asc" selected>Issue Number (Ascending)</option>
-                <option value="issue_number_desc">Issue Number (Descending)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </section>
 
 
       <!-- Issue List -->
@@ -826,13 +828,13 @@
       container.innerHTML = '';
       Object.entries(counts).forEach(([status, count]) => {
         const badge = document.createElement('div');
-        badge.className = `p-4 rounded-xl shadow-lg text-white text-center ${status === "Open" ? "bg-red-500" :
+        badge.className = `p-3 rounded-lg shadow text-white text-center text-sm leading-tight ${status === "Open" ? "bg-red-500" :
           status === "In development" ? "bg-yellow-500" :
             status === "Ready for QA" ? "bg-blue-500" :
               status === "Closed" ? "bg-green-600" :
                 "bg-gray-400"
           }`;
-        badge.innerHTML = `<p class="text-sm font-semibold">${status}</p><p class="text-xl font-bold">${count}</p>`;
+        badge.innerHTML = `<p class="text-xs font-semibold">${status}</p><p class="text-lg font-bold">${count}</p>`;
         container.appendChild(badge);
       });
     }
@@ -850,12 +852,12 @@
 
       Object.entries(typeCounts).forEach(([type, count]) => {
         const badge = document.createElement('div');
-        badge.className = `p-4 rounded-xl shadow-lg text-white text-center ${type === "Bug" ? "bg-pink-500" :
+        badge.className = `p-3 rounded-lg shadow text-white text-center text-sm leading-tight ${type === "Bug" ? "bg-pink-500" :
           type === "Improvement" ? "bg-blue-400" :
             type === "Test" ? "bg-purple-600" :
               "bg-gray-300"
           }`;
-        badge.innerHTML = `<p class="text-sm font-semibold">${type}</p><p class="text-xl font-bold">${count}</p>`;
+        badge.innerHTML = `<p class="text-xs font-semibold">${type}</p><p class="text-lg font-bold">${count}</p>`;
         container.appendChild(badge);
       });
     }
