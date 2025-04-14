@@ -34,10 +34,16 @@
       max-height: 1000px;
       /* large enough for any reply thread */
     }
+
+    html,
+    body {
+      scroll-behavior: auto !important;
+      overflow-x: hidden;
+    }
   </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gradient-to-br from-blue-50 to-purple-100 min-h-screen">
 
   <datalist id="userSuggestions"></datalist>
   <datalist id="tagSuggestions"></datalist>
@@ -46,7 +52,7 @@
   <div id="toast" class="hidden alert alert-success shadow-lg w-fit"></div>
 
   <!-- Auth Section -->
-  <section id="authSection" class="max-w-md mx-auto mt-10 bg-white p-6 rounded-xl shadow">
+  <section id="authSection" class="max-w-md mx-auto mt-10 bg-white border-2 border-purple-300 p-6 rounded-xl shadow-xl">
     <h2 class="text-2xl font-bold mb-4 text-center">Login</h2>
     <form id="loginForm" class="space-y-4">
       <input type="email" name="email" id="loginEmail" placeholder="Email" class="input input-bordered w-full"
@@ -69,14 +75,15 @@
   <div id="mainApp" class="hidden">
     <div class="max-w-7xl mx-auto p-6">
       <!-- Header -->
-      <header class="flex justify-between items-center mb-6">
+      <header
+        class="flex justify-between items-center mb-6 p-6 rounded-xl shadow-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
         <img src="logo-221bbs.png" alt="Logo" class="h-20 w-auto mr-4">
         <div>
-          <h1 class="text-3xl font-bold text-primary">Mycroft QA Management Tool</h1>
-          <p class="text-sm text-gray-500">Track bugs and improvements</p>
+          <h1 class="text-3xl font-bold">Mycroft QA Management Tool</h1>
+          <p class="text-sm">Track bugs and improvements</p>
         </div>
         <div class="text-right">
-          <p class="text-sm text-gray-600">Logged in as <span id="currentUserDisplay" class="font-semibold"></span></p>
+          <p class="text-sm">Logged in as <span id="currentUserDisplay" class="font-semibold"></span></p>
           <button id="logoutBtn" class="btn btn-sm mt-2">Logout</button>
         </div>
       </header>
@@ -195,7 +202,7 @@
             </dialog>
             <div class="modal-action mt-6">
               <button class="btn" onclick="viewModal.close()">Close</button>
-              <button class="btn btn-primary" onclick="toggleEditForm(true)">Edit</button>
+              <button class="btn btn-primary hover:btn-accent transition" onclick="toggleEditForm(true)">Edit</button>
             </div>
             <h3 class="text-xl font-bold mb-2" id="viewSummary"></h3>
             <p class="text-sm text-gray-500">Issue #: <span id="viewIssueNumber"></span></p>
@@ -255,7 +262,7 @@
             <div id="editPreview" class="flex flex-wrap gap-2"></div>
             <div class="modal-action">
               <button type="button" class="btn" onclick="toggleEditForm(false)">Cancel</button>
-              <button type="submit" class="btn btn-primary">Save</button>
+              <button type="submit" class="btn btn-primary hover:btn-accent transition">Save</button>
             </div>
           </form>
           <!-- Comments Section -->
@@ -265,7 +272,7 @@
             <div class="flex gap-2">
               <input id="newCommentInput" list="userSuggestions" type="text" placeholder="Write a comment..."
                 class="input input-bordered flex-1" />
-              <button id="addCommentBtn" class="btn btn-primary">Add</button>
+              <button id="addCommentBtn" class="btn btn-primary hover:btn-accent transition">Add</button>
             </div>
           </div>
 
@@ -819,7 +826,12 @@
       container.innerHTML = '';
       Object.entries(counts).forEach(([status, count]) => {
         const badge = document.createElement('div');
-        badge.className = `p-4 rounded-lg shadow text-center border`;
+        badge.className = `p-4 rounded-xl shadow-lg text-white text-center ${status === "Open" ? "bg-red-500" :
+          status === "In development" ? "bg-yellow-500" :
+            status === "Ready for QA" ? "bg-blue-500" :
+              status === "Closed" ? "bg-green-600" :
+                "bg-gray-400"
+          }`;
         badge.innerHTML = `<p class="text-sm font-semibold">${status}</p><p class="text-xl font-bold">${count}</p>`;
         container.appendChild(badge);
       });
@@ -838,7 +850,11 @@
 
       Object.entries(typeCounts).forEach(([type, count]) => {
         const badge = document.createElement('div');
-        badge.className = `p-4 rounded-lg shadow text-center border bg-white`;
+        badge.className = `p-4 rounded-xl shadow-lg text-white text-center ${type === "Bug" ? "bg-pink-500" :
+          type === "Improvement" ? "bg-blue-400" :
+            type === "Test" ? "bg-purple-600" :
+              "bg-gray-300"
+          }`;
         badge.innerHTML = `<p class="text-sm font-semibold">${type}</p><p class="text-xl font-bold">${count}</p>`;
         container.appendChild(badge);
       });
@@ -901,13 +917,18 @@
 
       for (const issue of issueList) {
         const card = document.createElement('div');
-        card.className = 'bg-white rounded-xl p-4 shadow cursor-pointer hover:bg-gray-50';
+        card.className = 'bg-gradient-to-br from-white to-blue-50 rounded-xl p-4 shadow-md hover:shadow-lg transition duration-300 cursor-pointer';
         card.onclick = () => showIssueDetails(issue);
 
         const tags = issue.tags ? issue.tags.split(',').map(tag => tag.trim()) : [];
         const tagsHtmlParts = await Promise.all(tags.map(async tag => {
           const color = await getColorForTag(tag);
-          return `<span class="badge cursor-pointer filter-tag" data-tag="${tag}" style="background-color: ${color}; color: white; margin-right: 0.5rem;">${tag}</span>`;
+          return `<span class="badge cursor-pointer filter-tag inline-block min-w-0 max-w-[140px] text-white px-3 text-sm leading-snug align-middle"
+  data-tag="${tag}"
+  title="${tag}"
+  style="background-color: ${color}; margin-right: 0.25rem;">
+  ${tag}
+</span>`;
         }));
         const tagsHtml = tagsHtmlParts.join(' ');
 
@@ -917,9 +938,11 @@
           <h3 class="text-lg font-semibold">${issue.issue_number || ''} - ${issue.summary}</h3>
           <p class="text-sm text-gray-500">${issue.type} • ${issue.priority} • ${issue.status}</p>
         </div>
-        <div class="text-sm text-right text-gray-400">${new Date(issue.created_at).toLocaleString()}
-          <div class="mt-2">${tagsHtml}</div>
-        </div>
+        <div class="flex flex-col items-end text-sm text-gray-400">
+  <div>${new Date(issue.created_at).toLocaleString()}</div>
+  <div class="mt-2 flex flex-wrap gap-1">${tagsHtml}</div>
+</div>
+
       </div>
       <p class="mt-2 text-sm">${(issue.description || '').slice(0, 100)}...</p>
     `;
@@ -1193,12 +1216,6 @@
         setTimeout(() => dropdown.style.display = 'none', 200);
       });
     }
-
-
-
-
   </script>
-
 </body>
-
 </html>
