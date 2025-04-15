@@ -918,6 +918,14 @@
       return color;
     }
 
+        function getTypeIcon(type) {
+      if (type === "Bug") return "🐞";
+      if (type === "Improvement") return "⚙️";
+      if (type === "Test") return "✅";
+      return "";
+    }
+
+
     async function renderIssues(issueList) {
       const list = document.getElementById('issueList');
       list.innerHTML = '';
@@ -931,11 +939,11 @@
         const tagsHtmlParts = await Promise.all(tags.map(async tag => {
           const color = await getColorForTag(tag);
           return `<span class="badge cursor-pointer filter-tag inline-block min-w-0 max-w-[140px] text-white px-3 text-sm leading-snug align-middle"
-  data-tag="${tag}"
-  title="${tag}"
-  style="background-color: ${color}; margin-right: 0.25rem;">
-  ${tag}
-</span>`;
+              data-tag="${tag}"
+              title="${tag}"
+              style="background-color: ${color}; margin-right: 0.25rem;">
+              ${tag}
+            </span>`;
         }));
         const tagsHtml = tagsHtmlParts.join(' ');
 
@@ -943,7 +951,9 @@
       <div class="flex justify-between items-center">
         <div>
           <h3 class="text-lg font-semibold">${issue.issue_number || ''} - ${issue.summary}</h3>
-          <p class="text-sm text-gray-500">${issue.type} • ${issue.priority} • ${issue.status}</p>
+          <p class="text-sm text-gray-500">
+          ${getTypeIcon(issue.type)} ${issue.type} • ${issue.priority} • ${issue.status}
+          </p>
         </div>
         <div class="flex flex-col items-end text-sm text-gray-400">
   <div>${new Date(issue.created_at).toLocaleString()}</div>
