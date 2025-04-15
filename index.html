@@ -541,8 +541,13 @@
         };
         const { error } = await supa.from('issues').insert([newIssue]);
         if (error) return showToast('Failed to submit issue', 'error');
+        
+          // ✅ RESET FORM
         form.reset();
+        createQuill.setContents([]);
         document.getElementById('preview').innerHTML = '';
+        document.getElementById('createIssueModal').close();
+
         showToast('Issue submitted');
         loadIssues();
       });
@@ -1218,6 +1223,12 @@
         setTimeout(() => dropdown.style.display = 'none', 200);
       });
     }
+
+
+
+
   </script>
+
 </body>
+
 </html>
