@@ -116,6 +116,7 @@
             <option>Open</option>
             <option>In development</option>
             <option>Ready for QA</option>
+            <option>QA Blocked</option>
             <option>Closed</option>
           </select>
           <select id="filterAssignee" class="select select-bordered col-span-6 lg:col-span-3">
@@ -246,6 +247,7 @@
               <option>Open</option>
               <option>In development</option>
               <option>Ready for QA</option>
+              <option>QA Blocked</option>
               <option>Closed</option>
             </select>
             <label class="label">Tags</label>
@@ -827,7 +829,7 @@
 
 
     function updateStatusCounts(issues) {
-      const counts = { Open: 0, 'In development': 0, 'Ready for QA': 0, Closed: 0 };
+      const counts = { Open: 0, 'In development': 0, 'Ready for QA': 0, 'QA Blocked': 0 , Closed: 0 };
       issues.forEach(issue => { if (counts[issue.status] !== undefined) counts[issue.status]++; });
       const container = document.getElementById('statusCounts');
       container.innerHTML = '';
@@ -836,6 +838,7 @@
         badge.className = `p-3 rounded-lg shadow text-white text-center text-sm leading-tight ${status === "Open" ? "bg-red-500" :
           status === "In development" ? "bg-yellow-500" :
             status === "Ready for QA" ? "bg-blue-500" :
+            status === "QA Blocked" ? "bg-cyan-500" :
               status === "Closed" ? "bg-green-600" :
                 "bg-gray-400"
           }`;
