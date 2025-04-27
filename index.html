@@ -40,6 +40,12 @@
       scroll-behavior: auto !important;
       overflow-x: hidden;
     }
+
+    textarea {
+      transition: height 0.2s ease;
+      overflow-y: hidden;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 
@@ -122,7 +128,8 @@
           <select id="filterAssignee" class="select select-bordered col-span-6 lg:col-span-3">
             <option value="">All Assignees</option>
           </select>
-          <select id="tagFilter" class="select select-bordered col-span-12 lg:col-span-6 h-[100px] overflow-auto" multiple></select>
+          <select id="tagFilter" class="select select-bordered col-span-12 lg:col-span-6 h-[100px] overflow-auto"
+            multiple></select>
 
           <!-- Buttons & Sort -->
           <div class="flex flex-wrap gap-2 col-span-12 justify-between items-center mt-2">
@@ -274,8 +281,9 @@
             <h4 class="text-lg font-bold mb-2">Comments</h4>
             <div id="commentList" class="space-y-2 mb-4"></div>
             <div class="flex gap-2">
-              <input id="newCommentInput" list="userSuggestions" type="text" placeholder="Write a comment..."
-                class="input input-bordered flex-1" />
+              <textarea id="newCommentInput" list="userSuggestions" placeholder="Write a comment..."
+                class="textarea textarea-bordered flex-1 resize-none min-h-[80px] overflow-hidden"
+                style="white-space: pre-wrap;" rows="2"></textarea>
               <button id="addCommentBtn" class="btn btn-primary hover:btn-accent transition">Add</button>
             </div>
           </div>
@@ -543,8 +551,8 @@
         };
         const { error } = await supa.from('issues').insert([newIssue]);
         if (error) return showToast('Failed to submit issue', 'error');
-        
-          // ✅ RESET FORM
+
+        // ✅ RESET FORM
         form.reset();
         createQuill.setContents([]);
         document.getElementById('preview').innerHTML = '';
@@ -829,7 +837,7 @@
 
 
     function updateStatusCounts(issues) {
-      const counts = { Open: 0, 'In development': 0, 'Ready for QA': 0, 'QA Blocked': 0 , Closed: 0 };
+      const counts = { Open: 0, 'In development': 0, 'Ready for QA': 0, 'QA Blocked': 0, Closed: 0 };
       issues.forEach(issue => { if (counts[issue.status] !== undefined) counts[issue.status]++; });
       const container = document.getElementById('statusCounts');
       container.innerHTML = '';
@@ -838,9 +846,9 @@
         badge.className = `p-3 rounded-lg shadow text-white text-center text-sm leading-tight ${status === "Open" ? "bg-red-500" :
           status === "In development" ? "bg-yellow-500" :
             status === "Ready for QA" ? "bg-blue-500" :
-            status === "QA Blocked" ? "bg-cyan-500" :
-              status === "Closed" ? "bg-green-600" :
-                "bg-gray-400"
+              status === "QA Blocked" ? "bg-cyan-500" :
+                status === "Closed" ? "bg-green-600" :
+                  "bg-gray-400"
           }`;
         badge.innerHTML = `<p class="text-xs font-semibold">${status}</p><p class="text-lg font-bold">${count}</p>`;
         container.appendChild(badge);
@@ -921,7 +929,7 @@
       return color;
     }
 
-        function getTypeIcon(type) {
+    function getTypeIcon(type) {
       if (type === "Bug") return "🐞";
       if (type === "Improvement") return "⚙️";
       if (type === "Test") return "✅";
@@ -1036,33 +1044,77 @@
 
 
     function setupCommentButtons() {
-      document.querySelectorAll('.edit-comment-btn').forEach(btn => {
-        btn.onclick = async () => {
-          const id = btn.dataset.id;
-          const input = document.querySelector(`.comment-input[data-id="${id}"]`);
-          if (input.readOnly) {
-            input.readOnly = false;
-            input.focus();
-            btn.textContent = '💾';
-          } else {
-            input.readOnly = true;
-            const updatedText = input.value.trim();
-            await supa.from('comments').update({ text: updatedText }).eq('id', id);
-            btn.textContent = '✏️';
-            showToast('Comment updated');
-          }
-        };
-      });
+  document.querySelectorAll('.edit-comment-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      const commentBlock = btn.closest('.comment-block');
+      const viewDiv = commentBlock.querySelector('.comment-view');
+      const editTextarea = commentBlock.querySelector('.comment-edit');
 
-      document.querySelectorAll('.delete-comment-btn').forEach(btn => {
-        btn.onclick = async () => {
-          const id = btn.dataset.id;
-          await supa.from('comments').delete().eq('id', id);
-          showToast('Comment deleted');
-          loadComments(document.getElementById('editForm').editId.value);
-        };
-      });
-    }
+      if (editTextarea.classList.contains('hidden')) {
+        // Switch to Edit Mode
+        viewDiv.classList.add('hidden');
+        editTextarea.classList.remove('hidden');
+        editTextarea.readOnly = false;
+        editTextarea.focus();
+        btn.textContent = '💾'; // Save icon
+      } else {
+        // Save changes
+        const updatedText = editTextarea.value.trim();
+        await supa.from('comments').update({ text: updatedText }).eq('id', id);
+
+        // Update view
+        viewDiv.innerHTML = marked.parse(updatedText);
+
+        editTextarea.classList.add('hidden');
+        viewDiv.classList.remove('hidden');
+        btn.textContent = '✏️'; // Edit icon
+        showToast('Comment updated');
+      }
+    };
+  });
+
+  // Auto-expand edit textareas
+  document.querySelectorAll('.comment-edit').forEach(textarea => {
+    textarea.addEventListener('input', function () {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+    });
+  });
+
+  // Press Enter (without Shift) to Save
+  document.querySelectorAll('.comment-edit').forEach(textarea => {
+    textarea.addEventListener('keydown', async function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const id = textarea.dataset.id;
+        const updatedText = textarea.value.trim();
+        await supa.from('comments').update({ text: updatedText }).eq('id', id);
+
+        const commentBlock = textarea.closest('.comment-block');
+        const viewDiv = commentBlock.querySelector('.comment-view');
+        const editBtn = commentBlock.querySelector('.edit-comment-btn');
+
+        viewDiv.innerHTML = marked.parse(updatedText);
+        textarea.classList.add('hidden');
+        viewDiv.classList.remove('hidden');
+        editBtn.textContent = '✏️';
+        showToast('Comment updated');
+      }
+    });
+  });
+
+  // Delete Comment Button
+  document.querySelectorAll('.delete-comment-btn').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      await supa.from('comments').delete().eq('id', id);
+      showToast('Comment deleted');
+      loadComments(document.getElementById('editForm').editId.value);
+    };
+  });
+}
+
 
     document.getElementById('addCommentBtn').addEventListener('click', async () => {
       const input = document.getElementById('newCommentInput');
@@ -1082,23 +1134,74 @@
       loadComments(issueId);
     });
 
-    function renderCommentThread(comment) {
-      const div = document.createElement('div');
-      div.className = 'comment-block bg-gray-100 p-3 rounded mb-2';
+    // 📸 Paste image inside comment
+    const commentInput = document.getElementById('newCommentInput');
 
-      div.innerHTML = `
+    commentInput.addEventListener('paste', async (event) => {
+  const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+  for (const item of items) {
+    if (item.type.indexOf('image') === 0) {
+      const file = item.getAsFile();
+      if (file) {
+        // Upload to Supabase Storage
+        const filePath = `comment_images/${Date.now()}_${file.name}`;
+        const { error } = await supa.storage.from('issues').upload(filePath, file);
+
+        if (!error) {
+          const { data, error: urlError } = supa.storage.from('issues').getPublicUrl(filePath);
+          if (!urlError && data && data.publicUrl) {
+            const publicUrl = data.publicUrl;
+
+            // Insert markdown image tag into textarea
+            const cursorPos = commentInput.selectionStart;
+            const textBefore = commentInput.value.substring(0, cursorPos);
+            const textAfter = commentInput.value.substring(cursorPos);
+            commentInput.value = `${textBefore}\n![Pasted Image](${publicUrl})\n${textAfter}`;
+
+            // Auto-expand
+            commentInput.style.height = 'auto';
+            commentInput.style.height = commentInput.scrollHeight + 'px';
+
+            showToast('Image pasted successfully!');
+          } else {
+            showToast('Failed to generate image URL', 'error');
+          }
+        } else {
+          showToast('Failed to upload pasted image', 'error');
+        }
+      }
+    }
+  }
+});
+
+
+function renderCommentThread(comment) {
+  const div = document.createElement('div');
+  div.className = 'comment-block bg-gray-100 p-3 rounded mb-2';
+
+  div.innerHTML = `
     <div>
       <p class="text-sm font-semibold mb-1">${comment.created_by}</p>
-      <input type="text" value="${comment.text}" 
-        class="input input-sm w-full mb-1 comment-input" 
-        data-id="${comment.id}" readonly>
+
+      <!-- View Mode -->
+      <div class="comment-view prose max-w-none mb-1">${marked.parse(comment.text)}</div>
+
+      <!-- Edit Mode -->
+      <textarea class="comment-edit textarea textarea-sm w-full mb-1 resize-none overflow-hidden hidden"
+                style="white-space: pre-wrap;"
+                data-id="${comment.id}"
+                rows="2">${comment.text}</textarea>
+
       <p class="text-xs text-gray-500">${new Date(comment.created_at).toLocaleString()}</p>
+
       <div class="flex gap-2 mt-1">
         <button class="btn btn-xs btn-outline edit-comment-btn" data-id="${comment.id}">✏️</button>
         <button class="btn btn-xs btn-outline btn-error delete-comment-btn" data-id="${comment.id}">🗑️</button>
         <button class="btn btn-xs btn-outline reply-btn" data-id="${comment.id}">↩️ Reply</button>
-        ${comment.children?.length ? `<button class="btn btn-xs btn-outline toggle-replies-btn" data-id="${comment.id}">Show replies (${comment.children.length})</button>` : ''}
+        ${comment.children?.length ? `<button class="btn btn-xs btn-outline toggle-replies-btn" data-id="${comment.id}">
+        Show replies (${comment.children.length})</button>` : ''}
       </div>
+
       <div class="reply-input mt-2 hidden transition-all duration-300 ease-in-out">
         <input type="text" class="input input-sm w-full mb-1 reply-text" placeholder="Write a reply..." list="userSuggestions" />
         <button class="btn btn-xs btn-primary post-reply-btn" data-parent="${comment.id}">Post</button>
@@ -1106,19 +1209,18 @@
     </div>
   `;
 
-      if (comment.children && comment.children.length) {
-        const childContainer = document.createElement('div');
-        childContainer.className = 'child-comments ml-6 mt-2 slide-toggle';
-        comment.children.forEach(child => {
-          childContainer.appendChild(renderCommentThread(child));
-        });
-        div.appendChild(childContainer);
-      }
+  // Handle child replies
+  if (comment.children && comment.children.length) {
+    const childContainer = document.createElement('div');
+    childContainer.className = 'child-comments ml-6 mt-2 slide-toggle';
+    comment.children.forEach(child => {
+      childContainer.appendChild(renderCommentThread(child));
+    });
+    div.appendChild(childContainer);
+  }
 
-      return div;
-    }
-
-
+  return div;
+}
 
     document.addEventListener('click', async (e) => {
       // Toggle reply input box
