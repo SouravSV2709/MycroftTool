@@ -16,6 +16,8 @@
   </script>
   <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
   <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
   <style>
     #toast {
       position: fixed;
@@ -46,6 +48,44 @@
       overflow-y: hidden;
       white-space: pre-wrap;
     }
+
+    .ts-wrapper.multi .ts-control {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 6px 8px;
+      min-height: 44px;
+      width: 100%;
+    }
+
+    .ts-wrapper.multi .ts-control>.item {
+      display: flex;
+      align-items: center;
+      background-color: #edf2f7;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.875rem;
+      color: #333;
+      max-width: max-content;
+      /* 👈 auto expands to fit content */
+    }
+
+    .ts-wrapper.multi .ts-control>.item .remove {
+      margin-left: 8px;
+      font-size: 1rem;
+      color: #888;
+      font-weight: bold;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .ts-dropdown {
+      min-width: 220px;
+    }
+  </style>
+
+  </style>
+
   </style>
 </head>
 
@@ -128,8 +168,7 @@
           <select id="filterAssignee" class="select select-bordered col-span-6 lg:col-span-3">
             <option value="">All Assignees</option>
           </select>
-          <select id="tagFilter" class="select select-bordered col-span-12 lg:col-span-6 h-[100px] overflow-auto"
-            multiple></select>
+          <select id="tagFilter" class="w-full" multiple></select>
 
           <!-- Buttons & Sort -->
           <div class="flex flex-wrap gap-2 col-span-12 justify-between items-center mt-2">
@@ -341,6 +380,7 @@
     let allIssues = [];
     let editRemovedImages = new Set();
     let uniqueTags = new Set();
+    let tagFilterSelect;
 
     // Cache to avoid repeat DB calls
     const tagColorMap = {};
@@ -396,6 +436,16 @@
         theme: 'snow',
         placeholder: 'Edit description here...'
       });
+
+      tagFilterSelect = new TomSelect("#tagFilter", {
+        plugins: ['remove_button'],
+        maxOptions: 1000,
+        persist: false,
+        closeAfterSelect: false,
+        placeholder: "Select tags...",
+        allowEmptyOption: true
+      });
+
 
       const issueForm = document.getElementById('issueForm');
       if (issueForm) {
@@ -480,6 +530,7 @@
         }
       })();
 
+
       document.getElementById('logoutBtn').addEventListener('click', () => {
         localStorage.removeItem('qa_user');
         currentUser = null;
@@ -499,8 +550,10 @@
           document.getElementById(id).value = '';
         });
 
-        // Clear all tag selections
-        Array.from(document.getElementById('tagFilter').options).forEach(opt => opt.selected = false);
+        // ✅ Clear Tom Select selected tags
+        if (tagFilterSelect) {
+          tagFilterSelect.clear(); // This resets selection
+        }
 
         applyFilters();
       });
@@ -772,19 +825,9 @@
       const priority = document.getElementById('filterPriority').value;
       const status = document.getElementById('filterStatus').value;
       const assignee = document.getElementById('filterAssignee').value;
+      const selectedTags = tagFilterSelect?.getValue() || [];
 
-      const tagFilter = document.getElementById('tagFilter');
-      const selectedTagValues = Array.from(tagFilter.selectedOptions).map(opt => opt.value);
 
-      // Deselect "All Tags" if other tags are also selected
-      if (selectedTagValues.includes("") && selectedTagValues.length > 1) {
-        Array.from(tagFilter.options).forEach(opt => {
-          if (opt.value === "") opt.selected = false;
-        });
-      }
-
-      // Final filtered tag values (ignore empty string)
-      const selectedTags = selectedTagValues.filter(Boolean);
 
 
       let filtered = allIssues.filter(issue => (
@@ -894,29 +937,19 @@
       const tagFilter = document.getElementById('tagFilter');
       const tagSuggestions = document.getElementById('tagSuggestions');
       tagSuggestions.innerHTML = '';
-      tagFilter.innerHTML = ''; // ✅ ADD THIS LINE
 
-      [...uniqueTags].sort().forEach(tag => {
-        // For tag input datalist
-        const opt1 = document.createElement('option');
-        opt1.value = tag;
-        tagSuggestions.appendChild(opt1);
-
-        // For tag filter dropdown
-        const opt2 = document.createElement('option');
-        opt2.value = tag;
-        opt2.textContent = tag;
-        tagFilter.appendChild(opt2);
-      });
+      if (tagFilterSelect) {
+        tagFilterSelect.clearOptions();
+        [...uniqueTags].sort().forEach(tag => {
+          tagFilterSelect.addOption({ value: tag, text: tag });
+        });
+        tagFilterSelect.refreshOptions(false);
+      }
       applyFilters();
 
       enableMultiTagAutocomplete('tagsInput');
       enableMultiTagAutocomplete('editFormTagsInput');
     }
-
-
-
-
 
 
     function getRandomColor() {
@@ -1044,76 +1077,76 @@
 
 
     function setupCommentButtons() {
-  document.querySelectorAll('.edit-comment-btn').forEach(btn => {
-    btn.onclick = async () => {
-      const id = btn.dataset.id;
-      const commentBlock = btn.closest('.comment-block');
-      const viewDiv = commentBlock.querySelector('.comment-view');
-      const editTextarea = commentBlock.querySelector('.comment-edit');
+      document.querySelectorAll('.edit-comment-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          const commentBlock = btn.closest('.comment-block');
+          const viewDiv = commentBlock.querySelector('.comment-view');
+          const editTextarea = commentBlock.querySelector('.comment-edit');
 
-      if (editTextarea.classList.contains('hidden')) {
-        // Switch to Edit Mode
-        viewDiv.classList.add('hidden');
-        editTextarea.classList.remove('hidden');
-        editTextarea.readOnly = false;
-        editTextarea.focus();
-        btn.textContent = '💾'; // Save icon
-      } else {
-        // Save changes
-        const updatedText = editTextarea.value.trim();
-        await supa.from('comments').update({ text: updatedText }).eq('id', id);
+          if (editTextarea.classList.contains('hidden')) {
+            // Switch to Edit Mode
+            viewDiv.classList.add('hidden');
+            editTextarea.classList.remove('hidden');
+            editTextarea.readOnly = false;
+            editTextarea.focus();
+            btn.textContent = '💾'; // Save icon
+          } else {
+            // Save changes
+            const updatedText = editTextarea.value.trim();
+            await supa.from('comments').update({ text: updatedText }).eq('id', id);
 
-        // Update view
-        viewDiv.innerHTML = marked.parse(updatedText);
+            // Update view
+            viewDiv.innerHTML = marked.parse(updatedText);
 
-        editTextarea.classList.add('hidden');
-        viewDiv.classList.remove('hidden');
-        btn.textContent = '✏️'; // Edit icon
-        showToast('Comment updated');
-      }
-    };
-  });
+            editTextarea.classList.add('hidden');
+            viewDiv.classList.remove('hidden');
+            btn.textContent = '✏️'; // Edit icon
+            showToast('Comment updated');
+          }
+        };
+      });
 
-  // Auto-expand edit textareas
-  document.querySelectorAll('.comment-edit').forEach(textarea => {
-    textarea.addEventListener('input', function () {
-      this.style.height = 'auto';
-      this.style.height = (this.scrollHeight) + 'px';
-    });
-  });
+      // Auto-expand edit textareas
+      document.querySelectorAll('.comment-edit').forEach(textarea => {
+        textarea.addEventListener('input', function () {
+          this.style.height = 'auto';
+          this.style.height = (this.scrollHeight) + 'px';
+        });
+      });
 
-  // Press Enter (without Shift) to Save
-  document.querySelectorAll('.comment-edit').forEach(textarea => {
-    textarea.addEventListener('keydown', async function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        const id = textarea.dataset.id;
-        const updatedText = textarea.value.trim();
-        await supa.from('comments').update({ text: updatedText }).eq('id', id);
+      // Press Enter (without Shift) to Save
+      document.querySelectorAll('.comment-edit').forEach(textarea => {
+        textarea.addEventListener('keydown', async function (e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const id = textarea.dataset.id;
+            const updatedText = textarea.value.trim();
+            await supa.from('comments').update({ text: updatedText }).eq('id', id);
 
-        const commentBlock = textarea.closest('.comment-block');
-        const viewDiv = commentBlock.querySelector('.comment-view');
-        const editBtn = commentBlock.querySelector('.edit-comment-btn');
+            const commentBlock = textarea.closest('.comment-block');
+            const viewDiv = commentBlock.querySelector('.comment-view');
+            const editBtn = commentBlock.querySelector('.edit-comment-btn');
 
-        viewDiv.innerHTML = marked.parse(updatedText);
-        textarea.classList.add('hidden');
-        viewDiv.classList.remove('hidden');
-        editBtn.textContent = '✏️';
-        showToast('Comment updated');
-      }
-    });
-  });
+            viewDiv.innerHTML = marked.parse(updatedText);
+            textarea.classList.add('hidden');
+            viewDiv.classList.remove('hidden');
+            editBtn.textContent = '✏️';
+            showToast('Comment updated');
+          }
+        });
+      });
 
-  // Delete Comment Button
-  document.querySelectorAll('.delete-comment-btn').forEach(btn => {
-    btn.onclick = async () => {
-      const id = btn.dataset.id;
-      await supa.from('comments').delete().eq('id', id);
-      showToast('Comment deleted');
-      loadComments(document.getElementById('editForm').editId.value);
-    };
-  });
-}
+      // Delete Comment Button
+      document.querySelectorAll('.delete-comment-btn').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.dataset.id;
+          await supa.from('comments').delete().eq('id', id);
+          showToast('Comment deleted');
+          loadComments(document.getElementById('editForm').editId.value);
+        };
+      });
+    }
 
 
     document.getElementById('addCommentBtn').addEventListener('click', async () => {
@@ -1138,48 +1171,48 @@
     const commentInput = document.getElementById('newCommentInput');
 
     commentInput.addEventListener('paste', async (event) => {
-  const items = (event.clipboardData || event.originalEvent.clipboardData).items;
-  for (const item of items) {
-    if (item.type.indexOf('image') === 0) {
-      const file = item.getAsFile();
-      if (file) {
-        // Upload to Supabase Storage
-        const filePath = `comment_images/${Date.now()}_${file.name}`;
-        const { error } = await supa.storage.from('issues').upload(filePath, file);
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const file = item.getAsFile();
+          if (file) {
+            // Upload to Supabase Storage
+            const filePath = `comment_images/${Date.now()}_${file.name}`;
+            const { error } = await supa.storage.from('issues').upload(filePath, file);
 
-        if (!error) {
-          const { data, error: urlError } = supa.storage.from('issues').getPublicUrl(filePath);
-          if (!urlError && data && data.publicUrl) {
-            const publicUrl = data.publicUrl;
+            if (!error) {
+              const { data, error: urlError } = supa.storage.from('issues').getPublicUrl(filePath);
+              if (!urlError && data && data.publicUrl) {
+                const publicUrl = data.publicUrl;
 
-            // Insert markdown image tag into textarea
-            const cursorPos = commentInput.selectionStart;
-            const textBefore = commentInput.value.substring(0, cursorPos);
-            const textAfter = commentInput.value.substring(cursorPos);
-            commentInput.value = `${textBefore}\n![Pasted Image](${publicUrl})\n${textAfter}`;
+                // Insert markdown image tag into textarea
+                const cursorPos = commentInput.selectionStart;
+                const textBefore = commentInput.value.substring(0, cursorPos);
+                const textAfter = commentInput.value.substring(cursorPos);
+                commentInput.value = `${textBefore}\n![Pasted Image](${publicUrl})\n${textAfter}`;
 
-            // Auto-expand
-            commentInput.style.height = 'auto';
-            commentInput.style.height = commentInput.scrollHeight + 'px';
+                // Auto-expand
+                commentInput.style.height = 'auto';
+                commentInput.style.height = commentInput.scrollHeight + 'px';
 
-            showToast('Image pasted successfully!');
-          } else {
-            showToast('Failed to generate image URL', 'error');
+                showToast('Image pasted successfully!');
+              } else {
+                showToast('Failed to generate image URL', 'error');
+              }
+            } else {
+              showToast('Failed to upload pasted image', 'error');
+            }
           }
-        } else {
-          showToast('Failed to upload pasted image', 'error');
         }
       }
-    }
-  }
-});
+    });
 
 
-function renderCommentThread(comment) {
-  const div = document.createElement('div');
-  div.className = 'comment-block bg-gray-100 p-3 rounded mb-2';
+    function renderCommentThread(comment) {
+      const div = document.createElement('div');
+      div.className = 'comment-block bg-gray-100 p-3 rounded mb-2';
 
-  div.innerHTML = `
+      div.innerHTML = `
     <div>
       <p class="text-sm font-semibold mb-1">${comment.created_by}</p>
 
@@ -1209,18 +1242,18 @@ function renderCommentThread(comment) {
     </div>
   `;
 
-  // Handle child replies
-  if (comment.children && comment.children.length) {
-    const childContainer = document.createElement('div');
-    childContainer.className = 'child-comments ml-6 mt-2 slide-toggle';
-    comment.children.forEach(child => {
-      childContainer.appendChild(renderCommentThread(child));
-    });
-    div.appendChild(childContainer);
-  }
+      // Handle child replies
+      if (comment.children && comment.children.length) {
+        const childContainer = document.createElement('div');
+        childContainer.className = 'child-comments ml-6 mt-2 slide-toggle';
+        comment.children.forEach(child => {
+          childContainer.appendChild(renderCommentThread(child));
+        });
+        div.appendChild(childContainer);
+      }
 
-  return div;
-}
+      return div;
+    }
 
     document.addEventListener('click', async (e) => {
       // Toggle reply input box
