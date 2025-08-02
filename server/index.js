@@ -8,6 +8,8 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
+const recentSubmissions = new Map(); // ✅ Declare early to avoid ReferenceError
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -16,6 +18,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 app.use(cors());
 app.use(express.json());
+
+
 
 // Storage for image uploads
 const uploadDir = path.join(__dirname, 'uploads');
@@ -63,34 +67,84 @@ app.get('/api/issues', async (req, res) => {
   }
 });
 
+
 // ➕ Create new issue
 app.post('/api/issues', async (req, res) => {
-  const { summary, description, type, priority, tags, assignee, created_by, status = 'Open', image_urls = [] } = req.body;
+  const {
+    summary,
+    description,
+    type,
+    priority,
+    tags,
+    assignee,
+    created_by,
+    status = 'Open',
+    image_urls = []
+  } = req.body;
+
+  const key = `${created_by}:${summary.trim().toLowerCase()}`;
+  const now = Date.now();
+  const prev = recentSubmissions.get(key);
+  const currentDesc = (description || '').trim();
+
+  if (prev && (now - prev.timestamp < 3000)) {
+    const previousDesc = prev.description || '';
+
+    // 🧠 Block only if the previous one had more or equal content
+    if (
+      previousDesc.length >= currentDesc.length ||
+      currentDesc.length < 10 // optional minimum quality threshold
+    ) {
+      console.warn("⏱️ Duplicate submission blocked:", key);
+      return res.status(429).json({ error: 'Duplicate submission blocked. Please wait a moment.' });
+    }
+  }
+
+  // ✅ Save this attempt
+  recentSubmissions.set(key, {
+    timestamp: now,
+    description: currentDesc
+  });
+
   try {
-    const result = await pool.query(
-      `INSERT INTO issues (summary, description, type, priority, tags, assignee, created_by, status, image_urls)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [summary, description, type, priority, tags, assignee || null, created_by, status, image_urls]
+    const numberResult = await pool.query(
+      `UPDATE issues_counter SET last_number = last_number + 1 RETURNING last_number`
     );
+    const next = numberResult.rows[0].last_number;
+    const issue_number = `MT-${next.toString().padStart(7, '0')}`;
+    console.log('🆕 New issue_number generated:', issue_number);
+
+    const result = await pool.query(
+      `INSERT INTO issues 
+        (summary, description, type, priority, tags, assignee, created_by, status, image_urls, issue_number)
+       VALUES 
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        summary,
+        description,
+        type,
+        priority,
+        tags,
+        assignee || null,
+        created_by,
+        status,
+        image_urls,
+        issue_number
+      ]
+    );
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error('Insert issue error:', err);
+    if (err.code === '23505') {
+      console.error('❗ Duplicate issue_number detected by DB');
+      return res.status(409).json({ error: 'Duplicate issue_number, try again.' });
+    }
+    console.error('❌ Error creating issue:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// 🔢 Get next issue number (by count)
-app.get('/api/issues/next-number', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT COUNT(*) FROM issues');
-    const count = parseInt(result.rows[0].count, 10) + 1;
-    res.json({ nextNumber: count });
-  } catch (err) {
-    console.error('Issue number error:', err);
-    res.status(500).json({ error: 'Internal error' });
-  }
-});
 
 // 📤 Upload Image
 app.post('/api/upload', upload.single('file'), (req, res) => {

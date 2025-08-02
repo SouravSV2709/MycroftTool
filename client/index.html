@@ -125,11 +125,11 @@
       <dialog id="createIssueModal" class="modal">
         <div class="modal-box w-full max-w-2xl">
           <h2 class="text-2xl font-semibold mb-4" id="createIssueHeading">Create New Issue</h2>
-          <form id="issueForm" class="space-y-4">
+          <form id="issueForm" class="space-y-4" novalidate>
             <input type="hidden" name="issue_number" id="issueNumberInput" />
             <input type="text" name="summary" placeholder="Summary" class="input input-bordered w-full" required />
             <div id="createDescEditor" class="quill bg-white" style="height: 150px;"></div>
-            <input type="hidden" name="description" required>
+            <input type="hidden" name="description">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <select name="type" class="select select-bordered w-full">
                 <option>Bug</option>
@@ -205,7 +205,7 @@
             <input name="summary" placeholder="Summary" class="input input-bordered w-full" required />
             <label class="label">Issue Description</label>
             <div id="editDescEditor" class="quill bg-white"></div>
-            <input type="hidden" name="description" required>
+            <input type="hidden" name="description">
             <label class="label">Issue Type</label>
             <select name="type" class="select select-bordered w-full">
               <option>Bug</option>
@@ -294,6 +294,15 @@
     let isSubmittingIssue = false;
     let issueFormHandlerAttached = false; // ✅ Prevent double binding
     let quill;
+
+    function createQuillEditor() {
+  if (document.getElementById('createDescEditor')) {
+    quill = new Quill('#createDescEditor', {
+      theme: 'snow',
+      placeholder: 'Write description here...',
+    });
+  }
+}
 
 
     async function loadIssues() {
@@ -449,6 +458,9 @@
         const div = document.createElement('div');
         div.className = 'p-4 mb-2 bg-white shadow rounded cursor-pointer';
         div.innerHTML = `
+        <p class="text-sm text-gray-500">
+          ${getTypeIcon(issue.type)} ${issue.type} • ${issue.priority} • ${issue.status}
+          </p>
           <h3>${issue.issue_number || ''} - ${issue.summary}</h3>
           <p class="text-sm text-gray-600">${issue.description?.slice(0, 100)}...</p>
           <div class="mt-1 flex flex-wrap gap-1 text-xs text-white">
@@ -460,7 +472,9 @@
               return `<span class="px-2 py-1 rounded text-white" style="background:${color}">${clean}</span>`;
             }).join('')
           }
-          </div>`;
+          </div>
+          <div class="bottom-0 right-0 text-yellow">${new Date(issue.created_at).toLocaleString()}</div>
+          `;
         div.onclick = () => showIssueDetails(issue);
         container.appendChild(div);
       });
@@ -485,12 +499,15 @@
 
       const imgContainer = document.getElementById('viewImages');
       imgContainer.innerHTML = '';
-      (issue.image_urls || []).forEach(url => {
-        const img = document.createElement('img');
-        img.src = url;
-        img.className = 'w-20 h-20 object-cover rounded';
-        imgContainer.appendChild(img);
-      });
+      (issue.image_urls || []).filter(url =>
+      typeof url === 'string' && url.startsWith('http')
+    ).forEach(url => {
+      const img = document.createElement('img');
+      img.src = url;
+      img.className = 'w-20 h-20 object-cover rounded';
+      imgContainer.appendChild(img);
+    });
+
 
       document.getElementById('viewModal').showModal();
     }
@@ -576,86 +593,96 @@
         applyFilters();
       });
 
-      quill = new Quill('#createDescEditor', {
-        theme: 'snow',
-        placeholder: 'Write description here...',
-      });
-
       document.getElementById('createIssueBtn').addEventListener('click', () => {
-        document.getElementById('issueForm').reset();
-        quill.setText('');
-        document.getElementById('issueNumberInput').value = '';
-        document.getElementById('createIssueHeading').textContent = 'Create New Issue';
-        document.getElementById('createIssueModal').showModal();
-      });
+  document.getElementById('issueForm').reset();
+  quill.setText('');  // 🔁 This alone is not enough
+  document.querySelector('input[name="description"]').value = '';
+  document.getElementById('issueNumberInput').value = '';
+  document.getElementById('createIssueHeading').textContent = 'Create New Issue';
 
-      document.getElementById('issueForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (isSubmittingIssue) return;  // ✅ Prevent duplicate submits
-        isSubmittingIssue = true;
+  // ✅ Ensure Quill is properly cleared
+  quill.setContents([{ insert: '\n' }]); // This restores placeholder logic
 
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
+  document.getElementById('createIssueModal').showModal();
+});
 
-        try {
-          // ✅ Get issue number only once per submission
-          const numberRes = await fetch(`${API_BASE_URL}/issues/next-number`);
-          const { issue_number } = await numberRes.json();
 
-          const form = e.target;
+      // 🛠 Fix double-submit by replacing the form node
+      const form = document.getElementById('issueForm');
+      const newForm = form.cloneNode(true);
+      form.parentNode.replaceChild(newForm, form);
 
-          // ✅ Sync hidden description field with Quill
-          document.querySelector('input[name="description"]').value = quill.root.innerHTML;
+      createQuillEditor();  // ✅ fix: rebind Quill to new form
 
-          const formData = new FormData(form);
 
-          if (!currentUser) {
-            alert('Not logged in');
-            return;
-          }
+      console.log("📌 Re-attached issue form submit handler");
 
-          // ✅ Upload images first
-          const images = await uploadImages(form.images.files);
+      newForm.addEventListener('submit', async (e) => {
+  console.trace("🔥 Submit Event Fired");
+  e.preventDefault();
 
-          const issue = {
-            issue_number,
-            summary: formData.get('summary'),
-            description: formData.get('description'),  // Already set above
-            type: formData.get('type'),
-            priority: formData.get('priority'),
-            tags: formData.get('tags'),
-            assignee: formData.get('assignee'),
-            created_by: currentUser.username,
-            image_urls: images
-          };
+  if (isSubmittingIssue) {
+    console.warn('🚫 Prevented duplicate issue submission');
+    return;
+  }
 
-          // ✅ Submit issue
-          const res = await fetch(`${API_BASE_URL}/issues`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(issue)
-          });
+  isSubmittingIssue = true;
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting...';
 
-          if (res.ok) {
-            alert('Issue created');
-            form.reset();
-            quill.setText('');
-            document.getElementById('createIssueModal').close();
-            loadIssues();
-          } else {
-            const err = await res.json();
-            alert(`Error: ${err.error || 'Failed to create issue'}`);
-          }
-        } catch (err) {
-          console.error('Issue submission failed:', err);
-          alert('Unexpected error');
-        } finally {
-          isSubmittingIssue = false;
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Submit Issue';
-        }
-      });
+  try {
+    const form = e.target;
+    const descHTML = quill.root.innerHTML;
+    console.log("📝 Quill description:", descHTML);
+    
+    // ✅ FIXED: Scoped to correct form
+    form.querySelector('input[name="description"]').value = descHTML;
+
+    const formData = new FormData(form);
+    const images = await uploadImages(form.images.files);
+    console.log("📸 Uploaded image URLs:", images);
+
+    const issue = {
+      summary: formData.get('summary'),
+      description: formData.get('description'),
+      type: formData.get('type'),
+      priority: formData.get('priority'),
+      tags: formData.get('tags'),
+      assignee: formData.get('assignee'),
+      created_by: currentUser.username,
+      image_urls: images
+    };
+
+    console.log("📤 Final issue to submit:", issue);
+
+    const res = await fetch(`${API_BASE_URL}/issues`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(issue)
+    });
+
+    if (res.ok) {
+      console.log("✅ Issue submitted successfully");
+      alert('✅ Issue created successfully');
+      form.reset();
+      quill.setText('');
+      document.getElementById('createIssueModal').close();
+      loadIssues();
+    } else {
+      const err = await res.json();
+      console.error("❌ Server responded with error:", err);
+      alert(`❌ Error: ${err.error || 'Failed to create issue'}`);
+    }
+  } catch (err) {
+    console.error('🔥 Issue creation failed:', err);
+    alert('Unexpected error occurred while creating issue.');
+  } finally {
+    isSubmittingIssue = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Issue';
+  }
+});
 
     });
 
@@ -671,6 +698,13 @@
         auth.classList.remove('hidden');
         app.classList.add('hidden');
       }
+    }
+
+    function getTypeIcon(type) {
+      if (type === "Bug") return "🐞";
+      if (type === "Improvement") return "⚙️";
+      if (type === "Test") return "✅";
+      return "";
     }
   </script>
 </body>
