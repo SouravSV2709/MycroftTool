@@ -569,15 +569,17 @@
       document.getElementById('viewAssignee').textContent = issue.assignee;
       document.getElementById('viewCreatedBy').textContent = issue.created_by;
 
-      const imgContainer = document.getElementById('viewImages');
-      imgContainer.innerHTML = '';
-      (issue.image_urls || []).filter(url =>
-        typeof url === 'string' && url.startsWith('http')
-      ).forEach(url => {
+      const viewImgs = document.getElementById('viewImages');
+      viewImgs.innerHTML = '';
+      (issue.image_urls || []).forEach(url => {
         const img = document.createElement('img');
         img.src = url;
-        img.className = 'w-20 h-20 object-cover rounded';
-        imgContainer.appendChild(img);
+        img.className = 'w-20 h-20 object-cover rounded cursor-pointer';
+        img.onclick = () => {
+          document.getElementById('modalImg').src = url;
+          document.getElementById('imgModal').showModal();
+        };
+        viewImgs.appendChild(img);
       });
 
 
@@ -617,6 +619,21 @@
       });
       await loadComments(issueId);
     }
+
+    // Scroll to Top button logic
+    const scrollTopBtn = document.getElementById('scrollTopBtn');
+
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 200) {
+        scrollTopBtn.classList.remove('hidden');
+      } else {
+        scrollTopBtn.classList.add('hidden');
+      }
+    });
+
+    scrollTopBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
       const saved = localStorage.getItem('qa_user');
@@ -777,6 +794,22 @@
           submitBtn.textContent = 'Submit Issue';
         }
       });
+
+      document.getElementById('imageInput').addEventListener('change', function (e) {
+        const preview = document.getElementById('preview');
+        preview.innerHTML = '';
+        Array.from(e.target.files).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = document.createElement('img');
+            img.src = event.target.result;
+            img.className = 'w-20 h-20 object-cover rounded';
+            preview.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
 
       document.getElementById('addCommentBtn').addEventListener('click', async () => {
         const text = document.getElementById('newCommentInput').value.trim();
