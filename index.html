@@ -436,22 +436,29 @@
     }
 
     function populateAssigneeFilter(assignees) {
-      const filter = document.getElementById('filterAssignee');
-      const create = document.getElementById('assigneeCreate');
-      const edit = document.getElementById('assigneeEdit');
+  const filter = document.getElementById('filterAssignee');
+  const create = document.getElementById('assigneeCreate');
+  const edit = document.getElementById('assigneeEdit');
 
-      const buildOptions = () => {
-        const opts = ['<option value="">Unassigned</option>'];
-        assignees.sort().forEach(name => {
-          opts.push(`<option value="${name}">${name}</option>`);
-        });
-        return opts.join('');
-      };
+  const buildOptions = () => {
+    const opts = ['<option value="">Unassigned</option>'];
+    assignees.sort().forEach(name => {
+      opts.push(`<option value="${name}">${name}</option>`);
+    });
+    return opts.join('');
+  };
 
-      filter.innerHTML = '<option value="">All Assignees</option>' + buildOptions();
-      create.innerHTML = buildOptions();
-      edit.innerHTML = buildOptions();
-    }
+  filter.innerHTML = '<option value="">All Assignees</option>' + buildOptions();
+  create.innerHTML = buildOptions();
+  edit.innerHTML = buildOptions();
+
+  // 🔁 Set default filters again after options are populated
+  if (currentUser) {
+    filter.value = currentUser.username;
+    document.getElementById('filterStatus').value = 'Open';
+    applyFilters();
+  }
+}
 
     function renderIssues(issues) {
       const container = document.getElementById('issueList');
