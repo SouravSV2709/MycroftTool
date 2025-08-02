@@ -625,6 +625,26 @@
         updateAuthUI();
       }
 
+      document.getElementById('togglePassword').addEventListener('click', () => {
+        const pwdInput = document.getElementById('loginPassword');
+        const toggleBtn = document.getElementById('togglePassword');
+        if (pwdInput.type === 'password') {
+          pwdInput.type = 'text';
+          toggleBtn.textContent = 'Hide';
+        } else {
+          pwdInput.type = 'password';
+          toggleBtn.textContent = 'Show';
+        }
+      });
+      // Load saved credentials if available
+      const savedEmail = localStorage.getItem('qa_saved_email');
+      const savedPassword = localStorage.getItem('qa_saved_password');
+      if (savedEmail && savedPassword) {
+        document.getElementById('loginEmail').value = savedEmail;
+        document.getElementById('loginPassword').value = savedPassword;
+        document.getElementById('rememberMe').checked = true;
+      }
+
       document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('loginEmail').value;
