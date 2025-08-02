@@ -287,9 +287,14 @@
 
   <!-- API Bridge and Frontend Logic -->
   <script>
-    // const API_BASE_URL = 'http://94.136.188.229:5000/api';
+    // // const API_BASE_URL = 'http://94.136.188.229:5000/api';
     // const API_BASE_URL = 'http://localhost:5000/api';
-    const API_BASE_URL = 'https://mycrofttool.onrender.com/api';
+    // // const API_BASE_URL = 'https://mycrofttool.onrender.com/api';
+
+    const API_BASE_URL = location.hostname.includes("github.io")
+  ? "https://mycrofttool.onrender.com/api"
+  : "http://localhost:5000/api";
+
     let currentUser = null;
     let tagColorMap = {};
     let allIssues = [];
@@ -363,6 +368,25 @@
         ))
       );
 
+      const sortValue = document.getElementById('sortSelect').value;
+      filtered.sort((a, b) => {
+        switch (sortValue) {
+          case 'tag_asc':
+            return (a.tags || '').localeCompare(b.tags || '');
+          case 'tag_desc':
+            return (b.tags || '').localeCompare(a.tags || '');
+          case 'created_asc':
+            return new Date(a.created_at) - new Date(b.created_at);
+          case 'created_desc':
+            return new Date(b.created_at) - new Date(a.created_at);
+          case 'issue_number_asc':
+            return (a.issue_number || '').localeCompare(b.issue_number || '', undefined, { numeric: true });
+          case 'issue_number_desc':
+            return (b.issue_number || '').localeCompare(a.issue_number || '', undefined, { numeric: true });
+          default:
+            return 0;
+        }
+      });
       renderIssues(filtered);
       updateStatusCounts(filtered);  // ✅ Add this
       updateTypeCounts(filtered);    // ✅ Add this
@@ -508,17 +532,20 @@
           </p>
           <h3>${issue.issue_number || ''} - ${issue.summary}</h3>
           <p class="text-sm text-gray-600">${issue.description?.slice(0, 100)}...</p>
-          <div class="mt-1 flex flex-wrap gap-1 text-xs text-white">
-            ${(issue.tags || '')
-            .split(',')
-            .map(t => {
-              const clean = t.trim();
-              const color = tagColorMap[clean.toLowerCase()] || '#a855f7'; // fallback purple
-              return `<span class="px-2 py-1 rounded text-white" style="background:${color}">${clean}</span>`;
-            }).join('')
-          }
-          </div>
-          <div class="bottom-0 right-0 text-yellow">${new Date(issue.created_at).toLocaleString()}</div>
+          <div class="mt-2 flex justify-between items-center">
+  <div class="flex gap-1 flex-wrap text-xs text-white">
+    ${(issue.tags || '')
+      .split(',')
+      .map(t => {
+        const clean = t.trim();
+        const color = tagColorMap[clean.toLowerCase()] || '#a855f7';
+        return `<span class="px-2 py-1 rounded" style="background:${color}">${clean}</span>`;
+      }).join('')
+    }
+  </div>
+  <div class="text-xs text-gray-500 ml-4 whitespace-nowrap">${new Date(issue.created_at).toLocaleString()}</div>
+</div>
+
           `;
         div.onclick = () => showIssueDetails(issue);
         container.appendChild(div);
@@ -638,6 +665,8 @@
         applyFilters();
       });
 
+      document.getElementById('sortSelect').addEventListener('change', applyFilters);
+
       document.getElementById('createIssueBtn').addEventListener('click', () => {
         document.getElementById('issueForm').reset();
         quill.setText('');  // 🔁 This alone is not enough
@@ -728,6 +757,20 @@
           submitBtn.textContent = 'Submit Issue';
         }
       });
+
+      document.getElementById('addCommentBtn').addEventListener('click', async () => {
+  const text = document.getElementById('newCommentInput').value.trim();
+  const issueNumber = document.getElementById('viewIssueNumber').textContent;
+
+  if (!text) return alert('Please write a comment.');
+  if (!issueNumber) return alert('No issue selected.');
+
+  const issue = allIssues.find(i => i.issue_number === issueNumber);
+  if (!issue) return alert('Issue not found');
+
+  await addComment(issue.id, text);
+  document.getElementById('newCommentInput').value = '';
+});
 
     });
 

@@ -205,7 +205,7 @@ app.put('/api/issues/:id', async (req, res) => {
         status,
         tags,
         assignee || null,
-        JSON.stringify(image_urls),
+        image_urls, // ✅ send as array, not JSON string
         id
       ]
     );
