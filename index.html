@@ -301,6 +301,7 @@
     let isSubmittingIssue = false;
     let issueFormHandlerAttached = false; // ✅ Prevent double binding
     let quill;
+    let firstLogin = true;
 
     function createQuillEditor() {
       if (document.getElementById('createDescEditor')) {
@@ -460,29 +461,35 @@
     }
 
     function populateAssigneeFilter(assignees) {
-      const filter = document.getElementById('filterAssignee');
-      const create = document.getElementById('assigneeCreate');
-      const edit = document.getElementById('assigneeEdit');
+  const filter = document.getElementById('filterAssignee');
+  const create = document.getElementById('assigneeCreate');
+  const edit = document.getElementById('assigneeEdit');
 
-      const buildOptions = () => {
-        const opts = ['<option value="">Unassigned</option>'];
-        assignees.sort().forEach(name => {
-          opts.push(`<option value="${name}">${name}</option>`);
-        });
-        return opts.join('');
-      };
+  const buildOptions = () => {
+    const opts = ['<option value="">Unassigned</option>'];
+    assignees.sort().forEach(name => {
+      opts.push(`<option value="${name}">${name}</option>`);
+    });
+    return opts.join('');
+  };
 
-      filter.innerHTML = '<option value="">All Assignees</option>' + buildOptions();
-      create.innerHTML = buildOptions();
-      edit.innerHTML = buildOptions();
+  filter.innerHTML = '<option value="">All Assignees</option>' + buildOptions();
+  create.innerHTML = buildOptions();
+  edit.innerHTML = buildOptions();
 
-      // 🔁 Set default filters again after options are populated
-      if (currentUser) {
-        filter.value = currentUser.username;
-        document.getElementById('filterStatus').value = 'Open';
-        applyFilters();
-      }
-    }
+  const existingFilters = localStorage.getItem('qa_filters');
+
+  if (firstLogin && !existingFilters) {
+    document.getElementById('filterStatus').value = 'Open';
+    document.getElementById('filterAssignee').value = currentUser.username;
+    saveFiltersToStorage();
+  }
+
+  restoreFiltersFromStorage();
+  applyFilters();
+}
+
+
 
     function toggleEditForm(show) {
       const viewMode = document.getElementById('viewMode');
@@ -686,21 +693,38 @@
         updateAuthUI();
       });
 
+      // Filter binding
+
       ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee', 'tagFilter'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-          el.addEventListener('change', applyFilters);
-          el.addEventListener('input', applyFilters);
+          const save = () => saveFiltersToStorage();
+          el.addEventListener('change', () => {
+            save();
+            applyFilters();
+          });
+          el.addEventListener('input', () => {
+            save();
+            applyFilters();
+          });
         }
       });
 
+      // Clear filter will remove local storage
+
       document.getElementById('clearFiltersBtn').addEventListener('click', () => {
-        ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee', 'tagFilter'].forEach(id => {
+        ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.value = '';
         });
+
+        const tagSelect = document.getElementById('tagFilter');
+        if (tagSelect.tomselect) tagSelect.tomselect.clear();
+
+        localStorage.removeItem('qa_filters');
         applyFilters();
       });
+
 
       document.getElementById('sortSelect').addEventListener('change', applyFilters);
 
@@ -912,20 +936,73 @@
     function updateAuthUI() {
       const auth = document.getElementById('authSection');
       const app = document.getElementById('mainApp');
+
       if (currentUser) {
         auth.classList.add('hidden');
         app.classList.remove('hidden');
         document.getElementById('currentUserDisplay').textContent = `${currentUser.username} (${currentUser.email})`;
 
-        // Set default filters
-        document.getElementById('filterStatus').value = 'Open';
-        document.getElementById('filterAssignee').value = currentUser.username;
+        const existingFilters = localStorage.getItem('qa_filters');
+        if (firstLogin && !existingFilters) {
+          document.getElementById('filterStatus').value = 'Open';
+          document.getElementById('filterAssignee').value = currentUser.username;
+          saveFiltersToStorage();  // Only save if nothing exists already
+        }
+
+        firstLogin = false;
         loadIssues();
       } else {
         auth.classList.remove('hidden');
         app.classList.add('hidden');
       }
     }
+
+
+    // Save filters to storage function
+
+    function saveFiltersToStorage() {
+      const filters = {
+        keyword: document.getElementById('filterInput').value,
+        type: document.getElementById('filterType').value,
+        priority: document.getElementById('filterPriority').value,
+        status: document.getElementById('filterStatus').value,
+        assignee: document.getElementById('filterAssignee').value,
+        tags: Array.from(document.getElementById('tagFilter').selectedOptions).map(opt => opt.value),
+        sort: document.getElementById('sortSelect').value,
+      };
+      localStorage.setItem('qa_filters', JSON.stringify(filters));
+    }
+
+    function restoreFiltersFromStorage() {
+      const stored = localStorage.getItem('qa_filters');
+      if (!stored) return;
+
+      try {
+        const filters = JSON.parse(stored);
+        document.getElementById('filterInput').value = filters.keyword || '';
+        document.getElementById('filterType').value = filters.type || '';
+        document.getElementById('filterPriority').value = filters.priority || '';
+        document.getElementById('filterStatus').value = filters.status || '';
+        document.getElementById('filterAssignee').value = filters.assignee || '';
+        document.getElementById('sortSelect').value = filters.sort || '';
+
+        setTimeout(() => {
+          if (filters.tags?.length) {
+            const tagSelect = document.getElementById('tagFilter');
+            filters.tags.forEach(tag => {
+              const opt = Array.from(tagSelect.options).find(o => o.value === tag);
+              if (opt) opt.selected = true;
+            });
+            tagSelect.dispatchEvent(new Event('change'));
+          }
+        }, 200);
+      } catch (err) {
+        console.warn('❌ Failed to parse stored filters');
+      }
+    }
+
+
+
 
     function getTypeIcon(type) {
       if (type === "Bug") return "🐞";
