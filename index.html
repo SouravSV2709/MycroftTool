@@ -695,6 +695,10 @@
         auth.classList.add('hidden');
         app.classList.remove('hidden');
         document.getElementById('currentUserDisplay').textContent = `${currentUser.username} (${currentUser.email})`;
+
+            // Set default filters
+        document.getElementById('filterStatus').value = 'Open';
+        document.getElementById('filterAssignee').value = currentUser.username;
         loadIssues();
       } else {
         auth.classList.remove('hidden');
