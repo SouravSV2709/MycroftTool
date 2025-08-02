@@ -159,6 +159,18 @@ app.put('/api/issues/:id', async (req, res) => {
     image_urls = []
   } = req.body;
 
+  console.log('✏️ Edit Payload:', {
+    id,
+    summary,
+    description,
+    type,
+    priority,
+    status,
+    tags,
+    assignee,
+    image_urls
+  });
+
   try {
     await pool.query(
       `UPDATE issues SET 
@@ -190,6 +202,7 @@ app.put('/api/issues/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal server error while updating issue' });
   }
 });
+
 
 
 
