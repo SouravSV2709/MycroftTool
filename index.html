@@ -292,8 +292,8 @@
     // // const API_BASE_URL = 'https://mycrofttool.onrender.com/api';
 
     const API_BASE_URL = location.hostname.includes("github.io")
-  ? "https://mycrofttool.onrender.com/api"
-  : "http://localhost:5000/api";
+      ? "https://mycrofttool.onrender.com/api"
+      : "http://localhost:5000/api";
 
     let currentUser = null;
     let tagColorMap = {};
@@ -535,13 +535,13 @@
           <div class="mt-2 flex justify-between items-center">
   <div class="flex gap-1 flex-wrap text-xs text-white">
     ${(issue.tags || '')
-      .split(',')
-      .map(t => {
-        const clean = t.trim();
-        const color = tagColorMap[clean.toLowerCase()] || '#a855f7';
-        return `<span class="px-2 py-1 rounded" style="background:${color}">${clean}</span>`;
-      }).join('')
-    }
+            .split(',')
+            .map(t => {
+              const clean = t.trim();
+              const color = tagColorMap[clean.toLowerCase()] || '#a855f7';
+              return `<span class="px-2 py-1 rounded" style="background:${color}">${clean}</span>`;
+            }).join('')
+          }
   </div>
   <div class="text-xs text-gray-500 ml-4 whitespace-nowrap">${new Date(issue.created_at).toLocaleString()}</div>
 </div>
@@ -759,101 +759,101 @@
       });
 
       document.getElementById('addCommentBtn').addEventListener('click', async () => {
-  const text = document.getElementById('newCommentInput').value.trim();
-  const issueNumber = document.getElementById('viewIssueNumber').textContent;
+        const text = document.getElementById('newCommentInput').value.trim();
+        const issueNumber = document.getElementById('viewIssueNumber').textContent;
 
-  if (!text) return alert('Please write a comment.');
-  if (!issueNumber) return alert('No issue selected.');
+        if (!text) return alert('Please write a comment.');
+        if (!issueNumber) return alert('No issue selected.');
 
-  const issue = allIssues.find(i => i.issue_number === issueNumber);
-  if (!issue) return alert('Issue not found');
+        const issue = allIssues.find(i => i.issue_number === issueNumber);
+        if (!issue) return alert('Issue not found');
 
-  await addComment(issue.id, text);
-  document.getElementById('newCommentInput').value = '';
-});
+        await addComment(issue.id, text);
+        document.getElementById('newCommentInput').value = '';
+      });
 
     });
 
     document.getElementById('editForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
+      e.preventDefault();
 
-  console.log("🛠 Edit form submitted");
+      console.log("🛠 Edit form submitted");
 
-  const form = e.target;
-  const submitBtn = form.querySelector('button[type="submit"]');
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Saving...';
+      const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
 
-  try {
-    const editId = form.querySelector('[name="editId"]').value;
-    console.log("🆔 Edit ID:", editId);
+      try {
+        const editId = form.querySelector('[name="editId"]').value;
+        console.log("🆔 Edit ID:", editId);
 
-    // ✅ Ensure Quill is ready
-    if (!window.editQuill) {
-      console.error("❌ Quill editor not initialized");
-      alert("Quill editor is not initialized");
-      return;
-    }
+        // ✅ Ensure Quill is ready
+        if (!window.editQuill) {
+          console.error("❌ Quill editor not initialized");
+          alert("Quill editor is not initialized");
+          return;
+        }
 
-    // ✅ Get description HTML from Quill
-    const descriptionHTML = window.editQuill.root.innerHTML;
-    console.log("📝 Edited description:", descriptionHTML);
+        // ✅ Get description HTML from Quill
+        const descriptionHTML = window.editQuill.root.innerHTML;
+        console.log("📝 Edited description:", descriptionHTML);
 
-    form.querySelector('input[name="description"]').value = descriptionHTML;
+        form.querySelector('input[name="description"]').value = descriptionHTML;
 
-    const files = form.querySelector('#editImageInput').files;
-    const uploadedUrls = await uploadImages(files);
-    console.log("📸 New uploaded image URLs:", uploadedUrls);
+        const files = form.querySelector('#editImageInput').files;
+        const uploadedUrls = await uploadImages(files);
+        console.log("📸 New uploaded image URLs:", uploadedUrls);
 
-    // 🔁 Merge existing + new images
-    let existing = [];
-    try {
-      existing = JSON.parse(form.dataset.imageUrls || '[]');
-    } catch (err) {
-      console.warn("⚠️ Could not parse existing image URLs");
-    }
-    const finalImageUrls = [...existing, ...uploadedUrls];
-    console.log("🧩 Final image URLs:", finalImageUrls);
+        // 🔁 Merge existing + new images
+        let existing = [];
+        try {
+          existing = JSON.parse(form.dataset.imageUrls || '[]');
+        } catch (err) {
+          console.warn("⚠️ Could not parse existing image URLs");
+        }
+        const finalImageUrls = [...existing, ...uploadedUrls];
+        console.log("🧩 Final image URLs:", finalImageUrls);
 
-    const formData = new FormData(form);
+        const formData = new FormData(form);
 
-    const updatedIssue = {
-      summary: formData.get('summary'),
-      description: formData.get('description'),
-      type: formData.get('type'),
-      priority: formData.get('priority'),
-      status: formData.get('status'),
-      tags: formData.get('tags'),
-      assignee: formData.get('assignee'),
-      image_urls: finalImageUrls,
-    };
+        const updatedIssue = {
+          summary: formData.get('summary'),
+          description: formData.get('description'),
+          type: formData.get('type'),
+          priority: formData.get('priority'),
+          status: formData.get('status'),
+          tags: formData.get('tags'),
+          assignee: formData.get('assignee'),
+          image_urls: finalImageUrls,
+        };
 
-    console.log("📤 Payload to backend:", updatedIssue);
+        console.log("📤 Payload to backend:", updatedIssue);
 
-    const res = await fetch(`${API_BASE_URL}/issues/${editId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedIssue),
+        const res = await fetch(`${API_BASE_URL}/issues/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatedIssue),
+        });
+
+        if (res.ok) {
+          console.log("✅ Issue updated successfully");
+          alert('✅ Issue updated successfully');
+          toggleEditForm(false);
+          loadIssues();
+        } else {
+          const err = await res.json();
+          console.error("❌ Server error response:", err);
+          alert(`❌ Error: ${err.error || 'Update failed'}`);
+        }
+      } catch (err) {
+        console.error('🔥 Unexpected error during edit:', err);
+        alert('Unexpected error occurred during update.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save';
+      }
     });
-
-    if (res.ok) {
-      console.log("✅ Issue updated successfully");
-      alert('✅ Issue updated successfully');
-      toggleEditForm(false);
-      loadIssues();
-    } else {
-      const err = await res.json();
-      console.error("❌ Server error response:", err);
-      alert(`❌ Error: ${err.error || 'Update failed'}`);
-    }
-  } catch (err) {
-    console.error('🔥 Unexpected error during edit:', err);
-    alert('Unexpected error occurred during update.');
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Save';
-  }
-});
 
 
     function updateAuthUI() {
