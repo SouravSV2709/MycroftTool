@@ -64,6 +64,7 @@
 
       <!-- Filters Section (Refined Layout) -->
       <section class="bg-white p-6 rounded-xl shadow mb-6">
+
         <!-- Status & Type Counts -->
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4" id="statusCounts"></div>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4" id="typeCounts"></div>
@@ -127,7 +128,7 @@
           <form id="issueForm" class="space-y-4">
             <input type="hidden" name="issue_number" id="issueNumberInput" />
             <input type="text" name="summary" placeholder="Summary" class="input input-bordered w-full" required />
-            <div id="createDescEditor" class="quill bg-white"></div>
+            <div id="createDescEditor" class="quill bg-white" style="height: 150px;"></div>
             <input type="hidden" name="description" required>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <select name="type" class="select select-bordered w-full">
@@ -142,8 +143,8 @@
               </select>
             </div>
             <div class="relative">
-              <input name="tags" id="tagsInput" placeholder="Tags (comma-separated)" class="input input-bordered w-full"
-                autocomplete="off" />
+              <input name="tags" id="tagsInput" list="tagSuggestions" placeholder="Tags (comma-separated)"
+                class="input input-bordered w-full" />
             </div>
 
             <label class="label">Assignee</label>
@@ -227,8 +228,8 @@
             </select>
             <label class="label">Tags</label>
             <div class="relative">
-              <input name="tags" id="editFormTagsInput" placeholder="Tags (comma-separated)"
-                class="input input-bordered w-full" autocomplete="off" />
+              <input name="tags" id="tagsInput" list="tagSuggestions" placeholder="Tags (comma-separated)"
+                class="input input-bordered w-full" />
             </div>
             <div>
               <label class="label">Assignee</label>
@@ -290,6 +291,10 @@
     let currentUser = null;
     let tagColorMap = {};
     let allIssues = [];
+    let isSubmittingIssue = false;
+    let issueFormHandlerAttached = false; // ✅ Prevent double binding
+    let quill;
+
 
     async function loadIssues() {
       const colorRes = await fetch(`${API_BASE_URL}/tag-colors`);
@@ -316,6 +321,14 @@
       });
       populateTagFilter([...allTagsSet]);
 
+      // 👇 Suggestion dropdown for create/edit forms
+      const tagSuggestions = document.getElementById('tagSuggestions');
+      tagSuggestions.innerHTML = '';
+      [...allTagsSet].forEach(tag => {
+        const opt = document.createElement('option');
+        opt.value = tag;
+        tagSuggestions.appendChild(opt);
+      });
       applyFilters();
     }
 
@@ -340,6 +353,50 @@
       );
 
       renderIssues(filtered);
+      updateStatusCounts(filtered);  // ✅ Add this
+      updateTypeCounts(filtered);    // ✅ Add this
+    }
+
+    function updateStatusCounts(issues) {
+      const counts = { Open: 0, 'In development': 0, 'Ready for QA': 0, 'QA Blocked': 0, Closed: 0 };
+      issues.forEach(issue => { if (counts[issue.status] !== undefined) counts[issue.status]++; });
+      const container = document.getElementById('statusCounts');
+      container.innerHTML = '';
+      Object.entries(counts).forEach(([status, count]) => {
+        const badge = document.createElement('div');
+        badge.className = `p-3 rounded-lg shadow text-white text-center text-sm leading-tight ${status === "Open" ? "bg-red-500" :
+          status === "In development" ? "bg-yellow-500" :
+            status === "Ready for QA" ? "bg-blue-500" :
+              status === "QA Blocked" ? "bg-cyan-500" :
+                status === "Closed" ? "bg-green-600" :
+                  "bg-gray-400"
+          }`;
+        badge.innerHTML = `<p class="text-xs font-semibold">${status}</p><p class="text-lg font-bold">${count}</p>`;
+        container.appendChild(badge);
+      });
+    }
+
+    function updateTypeCounts(issues) {
+      const typeCounts = { Bug: 0, Improvement: 0, Test: 0 };
+      issues.forEach(issue => {
+        if (typeCounts[issue.type] !== undefined) {
+          typeCounts[issue.type]++;
+        }
+      });
+
+      const container = document.getElementById('typeCounts');
+      container.innerHTML = '';
+
+      Object.entries(typeCounts).forEach(([type, count]) => {
+        const badge = document.createElement('div');
+        badge.className = `p-3 rounded-lg shadow text-white text-center text-sm leading-tight ${type === "Bug" ? "bg-pink-500" :
+          type === "Improvement" ? "bg-blue-400" :
+            type === "Test" ? "bg-purple-600" :
+              "bg-gray-300"
+          }`;
+        badge.innerHTML = `<p class="text-xs font-semibold">${type}</p><p class="text-lg font-bold">${count}</p>`;
+        container.appendChild(badge);
+      });
     }
 
     function populateTagFilter(tags) {
@@ -369,16 +426,21 @@
 
     function populateAssigneeFilter(assignees) {
       const filter = document.getElementById('filterAssignee');
-      filter.innerHTML = '<option value="">All Assignees</option>';
+      const create = document.getElementById('assigneeCreate');
+      const edit = document.getElementById('assigneeEdit');
 
-      assignees.sort().forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        filter.appendChild(opt);
-      });
+      const buildOptions = () => {
+        const opts = ['<option value="">Unassigned</option>'];
+        assignees.sort().forEach(name => {
+          opts.push(`<option value="${name}">${name}</option>`);
+        });
+        return opts.join('');
+      };
+
+      filter.innerHTML = '<option value="">All Assignees</option>' + buildOptions();
+      create.innerHTML = buildOptions();
+      edit.innerHTML = buildOptions();
     }
-
 
     function renderIssues(issues) {
       const container = document.getElementById('issueList');
@@ -498,14 +560,13 @@
         updateAuthUI();
       });
 
-      ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee', 'tagFilter']
-        .forEach(id => {
-          const el = document.getElementById(id);
-          if (el) {
-            el.addEventListener('change', applyFilters);
-            el.addEventListener('input', applyFilters);
-          }
-        });
+      ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee', 'tagFilter'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('change', applyFilters);
+          el.addEventListener('input', applyFilters);
+        }
+      });
 
       document.getElementById('clearFiltersBtn').addEventListener('click', () => {
         ['filterInput', 'filterType', 'filterPriority', 'filterStatus', 'filterAssignee', 'tagFilter'].forEach(id => {
@@ -515,48 +576,87 @@
         applyFilters();
       });
 
+      quill = new Quill('#createDescEditor', {
+        theme: 'snow',
+        placeholder: 'Write description here...',
+      });
 
-      document.getElementById('createIssueBtn').addEventListener('click', async () => {
-        const res = await fetch(`${API_BASE_URL}/issues/next-number`);
-        const { nextNumber } = await res.json();
-        const issueNumber = `MT-${nextNumber.toString().padStart(7, '0')}`;
-        document.getElementById('issueNumberInput').value = issueNumber;
-        document.getElementById('createIssueHeading').textContent = `Create New Issue (${issueNumber})`;
+      document.getElementById('createIssueBtn').addEventListener('click', () => {
+        document.getElementById('issueForm').reset();
+        quill.setText('');
+        document.getElementById('issueNumberInput').value = '';
+        document.getElementById('createIssueHeading').textContent = 'Create New Issue';
         document.getElementById('createIssueModal').showModal();
       });
 
-
       document.getElementById('issueForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const form = e.target;
-        const formData = new FormData(form);
-        const images = await uploadImages(form.images.files);
+        if (isSubmittingIssue) return;  // ✅ Prevent duplicate submits
+        isSubmittingIssue = true;
 
-        const issue = {
-          issue_number: formData.get('issue_number'), // ✅ add this line
-          summary: formData.get('summary'),
-          description: document.getElementById('createDescEditor').innerHTML,
-          type: formData.get('type'),
-          priority: formData.get('priority'),
-          tags: formData.get('tags'),
-          assignee: formData.get('assignee'),
-          created_by: currentUser.username,
-          image_urls: images
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
 
-        };
+        try {
+          // ✅ Get issue number only once per submission
+          const numberRes = await fetch(`${API_BASE_URL}/issues/next-number`);
+          const { issue_number } = await numberRes.json();
 
-        const res = await fetch(`${API_BASE_URL}/issues`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(issue)
-        });
+          const form = e.target;
 
-        if (res.ok) {
-          alert('Issue created');
-          form.reset();
-          loadIssues();
+          // ✅ Sync hidden description field with Quill
+          document.querySelector('input[name="description"]').value = quill.root.innerHTML;
+
+          const formData = new FormData(form);
+
+          if (!currentUser) {
+            alert('Not logged in');
+            return;
+          }
+
+          // ✅ Upload images first
+          const images = await uploadImages(form.images.files);
+
+          const issue = {
+            issue_number,
+            summary: formData.get('summary'),
+            description: formData.get('description'),  // Already set above
+            type: formData.get('type'),
+            priority: formData.get('priority'),
+            tags: formData.get('tags'),
+            assignee: formData.get('assignee'),
+            created_by: currentUser.username,
+            image_urls: images
+          };
+
+          // ✅ Submit issue
+          const res = await fetch(`${API_BASE_URL}/issues`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(issue)
+          });
+
+          if (res.ok) {
+            alert('Issue created');
+            form.reset();
+            quill.setText('');
+            document.getElementById('createIssueModal').close();
+            loadIssues();
+          } else {
+            const err = await res.json();
+            alert(`Error: ${err.error || 'Failed to create issue'}`);
+          }
+        } catch (err) {
+          console.error('Issue submission failed:', err);
+          alert('Unexpected error');
+        } finally {
+          isSubmittingIssue = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Issue';
         }
       });
+
     });
 
     function updateAuthUI() {
