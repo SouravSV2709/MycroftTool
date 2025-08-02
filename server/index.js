@@ -145,6 +145,53 @@ app.post('/api/issues', async (req, res) => {
   }
 });
 
+// ✏️ Update existing issue
+app.put('/api/issues/:id', async (req, res) => {
+  const { id } = req.params;
+  const {
+    summary,
+    description,
+    type,
+    priority,
+    status,
+    tags,
+    assignee,
+    image_urls = []
+  } = req.body;
+
+  try {
+    await pool.query(
+      `UPDATE issues SET 
+        summary = $1,
+        description = $2,
+        type = $3,
+        priority = $4,
+        status = $5,
+        tags = $6,
+        assignee = $7,
+        image_urls = $8
+       WHERE id = $9`,
+      [
+        summary,
+        description,
+        type,
+        priority,
+        status,
+        tags,
+        assignee || null,
+        JSON.stringify(image_urls),
+        id
+      ]
+    );
+
+    res.json({ message: 'Issue updated successfully' });
+  } catch (err) {
+    console.error('❌ Error updating issue:', err);
+    res.status(500).json({ error: 'Internal server error while updating issue' });
+  }
+});
+
+
 
 // 📤 Upload Image
 app.post('/api/upload', upload.single('file'), (req, res) => {

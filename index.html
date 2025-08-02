@@ -298,13 +298,13 @@
     let quill;
 
     function createQuillEditor() {
-  if (document.getElementById('createDescEditor')) {
-    quill = new Quill('#createDescEditor', {
-      theme: 'snow',
-      placeholder: 'Write description here...',
-    });
-  }
-}
+      if (document.getElementById('createDescEditor')) {
+        quill = new Quill('#createDescEditor', {
+          theme: 'snow',
+          placeholder: 'Write description here...',
+        });
+      }
+    }
 
 
     async function loadIssues() {
@@ -436,29 +436,65 @@
     }
 
     function populateAssigneeFilter(assignees) {
-  const filter = document.getElementById('filterAssignee');
-  const create = document.getElementById('assigneeCreate');
-  const edit = document.getElementById('assigneeEdit');
+      const filter = document.getElementById('filterAssignee');
+      const create = document.getElementById('assigneeCreate');
+      const edit = document.getElementById('assigneeEdit');
 
-  const buildOptions = () => {
-    const opts = ['<option value="">Unassigned</option>'];
-    assignees.sort().forEach(name => {
-      opts.push(`<option value="${name}">${name}</option>`);
-    });
-    return opts.join('');
-  };
+      const buildOptions = () => {
+        const opts = ['<option value="">Unassigned</option>'];
+        assignees.sort().forEach(name => {
+          opts.push(`<option value="${name}">${name}</option>`);
+        });
+        return opts.join('');
+      };
 
-  filter.innerHTML = '<option value="">All Assignees</option>' + buildOptions();
-  create.innerHTML = buildOptions();
-  edit.innerHTML = buildOptions();
+      filter.innerHTML = '<option value="">All Assignees</option>' + buildOptions();
+      create.innerHTML = buildOptions();
+      edit.innerHTML = buildOptions();
 
-  // 🔁 Set default filters again after options are populated
-  if (currentUser) {
-    filter.value = currentUser.username;
-    document.getElementById('filterStatus').value = 'Open';
-    applyFilters();
-  }
-}
+      // 🔁 Set default filters again after options are populated
+      if (currentUser) {
+        filter.value = currentUser.username;
+        document.getElementById('filterStatus').value = 'Open';
+        applyFilters();
+      }
+    }
+
+    function toggleEditForm(show) {
+      const viewMode = document.getElementById('viewMode');
+      const editForm = document.getElementById('editForm');
+      if (show) {
+        viewMode.classList.add('hidden');
+        editForm.classList.remove('hidden');
+
+        // Populate edit form with values from view modal
+        const issueNumber = document.getElementById('viewIssueNumber').textContent;
+        const issue = allIssues.find(i => i.issue_number === issueNumber);
+        if (!issue) return;
+
+        editForm.querySelector('[name="editId"]').value = issue.id;
+        editForm.querySelector('[name="summary"]').value = issue.summary;
+        editForm.querySelector('[name="type"]').value = issue.type;
+        editForm.querySelector('[name="priority"]').value = issue.priority;
+        editForm.querySelector('[name="status"]').value = issue.status;
+        editForm.querySelector('[name="tags"]').value = issue.tags;
+        editForm.querySelector('[name="assignee"]').value = issue.assignee;
+
+        // Initialize editDescEditor if not already
+        if (!window.editQuill) {
+          window.editQuill = new Quill('#editDescEditor', {
+            theme: 'snow',
+            placeholder: 'Write description here...',
+          });
+        }
+
+        window.editQuill.root.innerHTML = issue.description || '';
+      } else {
+        viewMode.classList.remove('hidden');
+        editForm.classList.add('hidden');
+      }
+    }
+
 
     function renderIssues(issues) {
       const container = document.getElementById('issueList');
@@ -509,13 +545,13 @@
       const imgContainer = document.getElementById('viewImages');
       imgContainer.innerHTML = '';
       (issue.image_urls || []).filter(url =>
-      typeof url === 'string' && url.startsWith('http')
-    ).forEach(url => {
-      const img = document.createElement('img');
-      img.src = url;
-      img.className = 'w-20 h-20 object-cover rounded';
-      imgContainer.appendChild(img);
-    });
+        typeof url === 'string' && url.startsWith('http')
+      ).forEach(url => {
+        const img = document.createElement('img');
+        img.src = url;
+        img.className = 'w-20 h-20 object-cover rounded';
+        imgContainer.appendChild(img);
+      });
 
 
       document.getElementById('viewModal').showModal();
@@ -603,17 +639,17 @@
       });
 
       document.getElementById('createIssueBtn').addEventListener('click', () => {
-  document.getElementById('issueForm').reset();
-  quill.setText('');  // 🔁 This alone is not enough
-  document.querySelector('input[name="description"]').value = '';
-  document.getElementById('issueNumberInput').value = '';
-  document.getElementById('createIssueHeading').textContent = 'Create New Issue';
+        document.getElementById('issueForm').reset();
+        quill.setText('');  // 🔁 This alone is not enough
+        document.querySelector('input[name="description"]').value = '';
+        document.getElementById('issueNumberInput').value = '';
+        document.getElementById('createIssueHeading').textContent = 'Create New Issue';
 
-  // ✅ Ensure Quill is properly cleared
-  quill.setContents([{ insert: '\n' }]); // This restores placeholder logic
+        // ✅ Ensure Quill is properly cleared
+        quill.setContents([{ insert: '\n' }]); // This restores placeholder logic
 
-  document.getElementById('createIssueModal').showModal();
-});
+        document.getElementById('createIssueModal').showModal();
+      });
 
 
       // 🛠 Fix double-submit by replacing the form node
@@ -627,73 +663,155 @@
       console.log("📌 Re-attached issue form submit handler");
 
       newForm.addEventListener('submit', async (e) => {
-  console.trace("🔥 Submit Event Fired");
+        console.trace("🔥 Submit Event Fired");
+        e.preventDefault();
+
+        if (isSubmittingIssue) {
+          console.warn('🚫 Prevented duplicate issue submission');
+          return;
+        }
+
+        isSubmittingIssue = true;
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        try {
+          const form = e.target;
+          const descHTML = quill.root.innerHTML;
+          console.log("📝 Quill description:", descHTML);
+
+          // ✅ FIXED: Scoped to correct form
+          form.querySelector('input[name="description"]').value = descHTML;
+
+          const formData = new FormData(form);
+          const images = await uploadImages(form.images.files);
+          console.log("📸 Uploaded image URLs:", images);
+
+          const issue = {
+            summary: formData.get('summary'),
+            description: formData.get('description'),
+            type: formData.get('type'),
+            priority: formData.get('priority'),
+            tags: formData.get('tags'),
+            assignee: formData.get('assignee'),
+            created_by: currentUser.username,
+            image_urls: images
+          };
+
+          console.log("📤 Final issue to submit:", issue);
+
+          const res = await fetch(`${API_BASE_URL}/issues`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(issue)
+          });
+
+          if (res.ok) {
+            console.log("✅ Issue submitted successfully");
+            alert('✅ Issue created successfully');
+            form.reset();
+            quill.setText('');
+            document.getElementById('createIssueModal').close();
+            loadIssues();
+          } else {
+            const err = await res.json();
+            console.error("❌ Server responded with error:", err);
+            alert(`❌ Error: ${err.error || 'Failed to create issue'}`);
+          }
+        } catch (err) {
+          console.error('🔥 Issue creation failed:', err);
+          alert('Unexpected error occurred while creating issue.');
+        } finally {
+          isSubmittingIssue = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Issue';
+        }
+      });
+
+    });
+
+    document.getElementById('editForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  if (isSubmittingIssue) {
-    console.warn('🚫 Prevented duplicate issue submission');
-    return;
-  }
+  console.log("🛠 Edit form submitted");
 
-  isSubmittingIssue = true;
-  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Submitting...';
+  submitBtn.textContent = 'Saving...';
 
   try {
-    const form = e.target;
-    const descHTML = quill.root.innerHTML;
-    console.log("📝 Quill description:", descHTML);
-    
-    // ✅ FIXED: Scoped to correct form
-    form.querySelector('input[name="description"]').value = descHTML;
+    const editId = form.querySelector('[name="editId"]').value;
+    console.log("🆔 Edit ID:", editId);
+
+    // ✅ Ensure Quill is ready
+    if (!window.editQuill) {
+      console.error("❌ Quill editor not initialized");
+      alert("Quill editor is not initialized");
+      return;
+    }
+
+    // ✅ Get description HTML from Quill
+    const descriptionHTML = window.editQuill.root.innerHTML;
+    console.log("📝 Edited description:", descriptionHTML);
+
+    form.querySelector('input[name="description"]').value = descriptionHTML;
+
+    const files = form.querySelector('#editImageInput').files;
+    const uploadedUrls = await uploadImages(files);
+    console.log("📸 New uploaded image URLs:", uploadedUrls);
+
+    // 🔁 Merge existing + new images
+    let existing = [];
+    try {
+      existing = JSON.parse(form.dataset.imageUrls || '[]');
+    } catch (err) {
+      console.warn("⚠️ Could not parse existing image URLs");
+    }
+    const finalImageUrls = [...existing, ...uploadedUrls];
+    console.log("🧩 Final image URLs:", finalImageUrls);
 
     const formData = new FormData(form);
-    const images = await uploadImages(form.images.files);
-    console.log("📸 Uploaded image URLs:", images);
 
-    const issue = {
+    const updatedIssue = {
       summary: formData.get('summary'),
       description: formData.get('description'),
       type: formData.get('type'),
       priority: formData.get('priority'),
+      status: formData.get('status'),
       tags: formData.get('tags'),
       assignee: formData.get('assignee'),
-      created_by: currentUser.username,
-      image_urls: images
+      image_urls: finalImageUrls,
     };
 
-    console.log("📤 Final issue to submit:", issue);
+    console.log("📤 Payload to backend:", updatedIssue);
 
-    const res = await fetch(`${API_BASE_URL}/issues`, {
-      method: 'POST',
+    const res = await fetch(`${API_BASE_URL}/issues/${editId}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(issue)
+      body: JSON.stringify(updatedIssue),
     });
 
     if (res.ok) {
-      console.log("✅ Issue submitted successfully");
-      alert('✅ Issue created successfully');
-      form.reset();
-      quill.setText('');
-      document.getElementById('createIssueModal').close();
+      console.log("✅ Issue updated successfully");
+      alert('✅ Issue updated successfully');
+      toggleEditForm(false);
       loadIssues();
     } else {
       const err = await res.json();
-      console.error("❌ Server responded with error:", err);
-      alert(`❌ Error: ${err.error || 'Failed to create issue'}`);
+      console.error("❌ Server error response:", err);
+      alert(`❌ Error: ${err.error || 'Update failed'}`);
     }
   } catch (err) {
-    console.error('🔥 Issue creation failed:', err);
-    alert('Unexpected error occurred while creating issue.');
+    console.error('🔥 Unexpected error during edit:', err);
+    alert('Unexpected error occurred during update.');
   } finally {
-    isSubmittingIssue = false;
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit Issue';
+    submitBtn.textContent = 'Save';
   }
 });
 
-    });
 
     function updateAuthUI() {
       const auth = document.getElementById('authSection');
@@ -703,7 +821,7 @@
         app.classList.remove('hidden');
         document.getElementById('currentUserDisplay').textContent = `${currentUser.username} (${currentUser.email})`;
 
-            // Set default filters
+        // Set default filters
         document.getElementById('filterStatus').value = 'Open';
         document.getElementById('filterAssignee').value = currentUser.username;
         loadIssues();
