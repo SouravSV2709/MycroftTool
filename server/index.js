@@ -183,7 +183,7 @@ app.put('/api/issues/:id', async (req, res) => {
         status = $5,
         tags = $6,
         assignee = $7,
-        image_urls = $8
+        image_urls = $8::text[]
        WHERE id = $9`,
       [
         summary,
@@ -193,7 +193,7 @@ app.put('/api/issues/:id', async (req, res) => {
         status,
         tags,
         assignee || null,
-        image_urls, // ✅ send as array, not JSON string
+        image_urls || [], // ✅ send as array, not JSON string
         id
       ]
     );
