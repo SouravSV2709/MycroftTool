@@ -893,7 +893,10 @@
         } catch (err) {
           console.warn("⚠️ Could not parse existing image URLs");
         }
-        const finalImageUrls = [...existing, ...uploadedUrls];
+        // ✅ Remove null, undefined, empty strings, and base64 previews
+const finalImageUrls = [...existing, ...uploadedUrls]
+  .filter(url => typeof url === 'string' && url.trim() !== '' && !url.startsWith('data:image/'));
+
         console.log("🧩 Final image URLs:", finalImageUrls);
 
         const formData = new FormData(form);

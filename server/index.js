@@ -193,7 +193,7 @@ app.put('/api/issues/:id', async (req, res) => {
         status,
         tags,
         assignee || null,
-        image_urls || [], // ✅ send as array, not JSON string
+(image_urls || []).filter(u => typeof u === 'string' && u.trim() !== ''), // ✅ clean array
         id
       ]
     );
