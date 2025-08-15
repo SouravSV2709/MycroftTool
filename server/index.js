@@ -180,28 +180,29 @@ app.put('/api/issues/:id', async (req, res) => {
       : [];
 
     await pool.query(
-      `UPDATE issues SET 
-        summary = $1,
-        description = $2,
-        type = $3,
-        priority = $4,
-        status = $5,
-        tags = $6,
-        assignee = $7,
-        image_urls = $8::text[]
-       WHERE id = $9`,
-      [
-        summary,
-        description,
-        type,
-        priority,
-        status,
-        tags,
-        assignee || null,
-        urlsArray,
-        id
-      ]
-    );
+  `UPDATE issues SET 
+    summary = $1,
+    description = $2,
+    type = $3,
+    priority = $4,
+    status = $5,
+    tags = $6,
+    assignee = $7,
+    image_urls = $8::text[]
+   WHERE id = $9`,
+  [
+    summary,
+    description,
+    type,
+    priority,
+    status,
+    tags,
+    assignee || null,
+    Array.isArray(image_urls) ? image_urls.filter(u => typeof u === 'string' && u.trim() !== '') : [],
+    id
+  ]
+);
+
 
     res.json({ message: 'Issue updated successfully' });
   } catch (err) {
