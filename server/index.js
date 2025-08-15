@@ -170,10 +170,15 @@ app.put('/api/issues/:id', async (req, res) => {
     status,
     tags,
     assignee,
-    image_urls = []
+    image_urls
   } = req.body;
 
   try {
+    // ✅ Ensure image_urls is a proper array of strings
+    const urlsArray = Array.isArray(image_urls)
+      ? image_urls.filter(u => typeof u === 'string' && u.trim() !== '')
+      : [];
+
     await pool.query(
       `UPDATE issues SET 
         summary = $1,
@@ -193,7 +198,7 @@ app.put('/api/issues/:id', async (req, res) => {
         status,
         tags,
         assignee || null,
-(image_urls || []).filter(u => typeof u === 'string' && u.trim() !== ''), // ✅ clean array
+        urlsArray,
         id
       ]
     );
@@ -204,6 +209,7 @@ app.put('/api/issues/:id', async (req, res) => {
     res.status(500).json({ error: 'Internal server error while updating issue' });
   }
 });
+
 
 
 // 📤 Upload Image
