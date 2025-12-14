@@ -312,6 +312,27 @@
       }
     }
 
+    function setIssueHash(issueNumber) {
+      if (!issueNumber) return;
+      const newHash = `#${encodeURIComponent(issueNumber)}`;
+      if (window.location.hash !== newHash) {
+        history.replaceState(null, '', newHash);
+      }
+    }
+
+    function clearIssueHash() {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+
+    function openIssueFromHash() {
+      const issueNumber = decodeURIComponent((window.location.hash || '').replace('#', '')).trim();
+      if (!issueNumber) return;
+      const match = allIssues.find(issue => issue.issue_number === issueNumber);
+      if (match) showIssueDetails(match, true);
+    }
+
+    window.addEventListener('hashchange', openIssueFromHash);
+
 
     async function loadIssues() {
       const colorRes = await fetch(`${API_BASE_URL}/tag-colors`);
@@ -347,6 +368,7 @@
         tagSuggestions.appendChild(opt);
       });
       applyFilters();
+      openIssueFromHash();
     }
 
     function applyFilters() {
@@ -507,6 +529,7 @@
         const issue = allIssues.find(i => i.issue_number === issueNumber);
         if (!issue) return;
 
+        document.getElementById('editIssueNumber').textContent = issue.issue_number || '';
         editForm.querySelector('[name="editId"]').value = issue.id;
         editForm.querySelector('[name="summary"]').value = issue.summary;
         editForm.querySelector('[name="type"]').value = issue.type;
@@ -535,9 +558,10 @@
       const container = document.getElementById('issueList');
       container.innerHTML = '';
       issues.forEach(issue => {
-        const div = document.createElement('div');
-        div.className = 'p-4 mb-2 bg-white shadow rounded cursor-pointer';
-        div.innerHTML = `
+        const link = document.createElement('a');
+        link.className = 'block p-4 mb-2 bg-white shadow rounded';
+        link.href = issue.issue_number ? `#${encodeURIComponent(issue.issue_number)}` : '#';
+        link.innerHTML = `
         <p class="text-sm text-gray-500">
           ${getTypeIcon(issue.type)} ${issue.type} • ${issue.priority} • ${issue.status}
           </p>
@@ -558,12 +582,16 @@
 </div>
 
           `;
-        div.onclick = () => showIssueDetails(issue);
-        container.appendChild(div);
+        link.onclick = (event) => {
+          event.preventDefault();
+          showIssueDetails(issue);
+        };
+        container.appendChild(link);
       });
     }
 
-    function showIssueDetails(issue) {
+    function showIssueDetails(issue, skipHashUpdate = false) {
+      if (!skipHashUpdate) setIssueHash(issue.issue_number);
       document.getElementById('viewSummary').textContent = `${issue.summary}`;
       document.getElementById('viewIssueNumber').textContent = issue.issue_number;
       document.getElementById('viewMeta').textContent = `${issue.type} • ${issue.priority} • ${issue.status}`;
@@ -652,6 +680,9 @@
         currentUser = JSON.parse(saved);
         updateAuthUI();
       }
+
+      const viewModal = document.getElementById('viewModal');
+      if (viewModal) viewModal.addEventListener('close', clearIssueHash);
 
       document.getElementById('togglePassword').addEventListener('click', () => {
         const pwdInput = document.getElementById('loginPassword');
